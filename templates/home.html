@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Accueil - Plateforme d'Évaluation Automatisée{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row mb-5">
+        <div class="col-lg-8 mx-auto text-center">
+            <h1 class="display-4 mb-4">Plateforme d'Évaluation Automatisée des Exercices de Bases de Données</h1>
+            <p class="lead">
+                Bienvenue sur notre plateforme intelligente qui permet aux professeurs de déposer des exercices
+                et aux étudiants de soumettre leurs réponses pour une évaluation automatique.
+            </p>
+            
+            {% if user.is_authenticated %}
+                <div class="mt-4">
+                    {% if user.is_teacher %}
+                        <a href="{% url 'exercises:exercise_create' %}" class="btn btn-primary me-2">
+                            <i class="bi bi-plus-circle"></i> Créer un exercice
+                        </a>
+                    {% else %}
+                        <a href="{% url 'exercises:exercise_list' %}" class="btn btn-primary me-2">
+                            <i class="bi bi-journal-text"></i> Voir les exercices
+                        </a>
+                    {% endif %}
+                    
+                    <a href="{% url 'dashboard:dashboard' %}" class="btn btn-outline-primary">
+                        <i class="bi bi-speedometer2"></i> Tableau de bord
+                    </a>
+                </div>
+            {% else %}
+                <div class="mt-4">
+                    <a href="{% url 'accounts:login' %}" class="btn btn-primary me-2">Connexion</a>
+                    <a href="{% url 'accounts:register' %}" class="btn btn-outline-primary">Inscription</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="row g-4">
+        <!-- Bloc Fonctionnalités -->
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <i class="bi bi-gear-fill text-primary" style="font-size: 2rem;"></i>
+                    </div>
+                    <h3 class="card-title text-center">Fonctionnalités</h3>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Correction automatique par IA</li>
+                        <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Notation intelligente</li>
+                        <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Feedback détaillé pour chaque exercice</li>
+                        <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Tableaux de bord analytiques</li>
+                        <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Interface intuitive et moderne</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bloc Pour les Étudiants -->
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <i class="bi bi-mortarboard-fill text-primary" style="font-size: 2rem;"></i>
+                    </div>
+                    <h3 class="card-title text-center">Pour les Étudiants</h3>
+                    <p>En tant qu'étudiant, vous pouvez :</p>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><i class="bi bi-arrow-right text-primary me-2"></i> Accéder aux exercices publiés</li>
+                        <li class="mb-2"><i class="bi bi-arrow-right text-primary me-2"></i> Soumettre vos réponses en PDF</li>
+                        <li class="mb-2"><i class="bi bi-arrow-right text-primary me-2"></i> Recevoir des corrections automatiques</li>
+                        <li class="mb-2"><i class="bi bi-arrow-right text-primary me-2"></i> Suivre votre progression</li>
+                        <li class="mb-2"><i class="bi bi-arrow-right text-primary me-2"></i> Visualiser vos résultats avec des graphiques</li>
+                    </ul>
+                    {% if not user.is_authenticated %}
+                        <div class="text-center mt-3">
+                            <a href="{% url 'accounts:register' %}?type=student" class="btn btn-sm btn-outline-primary">S'inscrire comme étudiant</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bloc Pour les Professeurs -->
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <i class="bi bi-person-workspace text-primary" style="font-size: 2rem;"></i>
+                    </div>
+                    <h3 class="card-title text-center">Pour les Professeurs</h3>
+                    <p>En tant que professeur, vous pouvez :</p>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><i class="bi bi-arrow-right text-primary me-2"></i> Créer et gérer des exercices</li>
+                        <li class="mb-2"><i class="bi bi-arrow-right text-primary me-2"></i> Ajouter des corrections de référence</li>
+                        <li class="mb-2"><i class="bi bi-arrow-right text-primary me-2"></i> Réviser les évaluations automatiques</li>
+                        <li class="mb-2"><i class="bi bi-arrow-right text-primary me-2"></i> Suivre les performances des étudiants</li>
+                        <li class="mb-2"><i class="bi bi-arrow-right text-primary me-2"></i> Analyser les statistiques détaillées</li>
+                    </ul>
+                    {% if not user.is_authenticated %}
+                        <div class="text-center mt-3">
+                            <a href="{% url 'accounts:register' %}?type=teacher" class="btn btn-sm btn-outline-primary">S'inscrire comme professeur</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Section IA -->
+    <div class="row mt-5">
+        <div class="col-lg-10 mx-auto">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <div class="row align-items-center">
+                        <div class="col-md-4 text-center">
+                            <img src="{% static 'images/ai-illustration.svg' %}" alt="Intelligence Artificielle" class="img-fluid mb-3 mb-md-0" style="max-height: 180px;" onerror="this.onerror=null; this.src='data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22200%22%20height%3D%22180%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20200%20180%22%20preserveAspectRatio%3D%22none%22%3E%3Cdefs%3E%3Cstyle%20type%3D%22text%2Fcss%22%3E%23holder_18e82cb2288%20text%20%7B%20fill%3A%236c757d%3Bfont-weight%3Abold%3Bfont-family%3AArial%2C%20Helvetica%2C%20Open%20Sans%2C%20sans-serif%2C%20monospace%3Bfont-size%3A10pt%20%7D%20%3C%2Fstyle%3E%3C%2Fdefs%3E%3Cg%20id%3D%22holder_18e82cb2288%22%3E%3Crect%20width%3D%22200%22%20height%3D%22180%22%20fill%3D%22%23e9ecef%22%3E%3C%2Frect%3E%3Cg%3E%3Ctext%20x%3D%2275.5%22%20y%3D%2295.1%22%3EAI%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E';">
+                        </div>
+                        <div class="col-md-8">
+                            <h2 class="card-title">Correction Automatisée par Intelligence Artificielle</h2>
+                            <p class="card-text">
+                                Notre plateforme utilise DeepSeek via Ollama pour générer des corrections automatiques précises et pertinentes.
+                                L'IA analyse les réponses des étudiants, les compare aux corrections de référence et fournit des retours détaillés.
+                            </p>
+                            <p class="card-text">
+                                Les professeurs peuvent ensuite réviser ces évaluations, les ajuster si nécessaire, et l'IA s'améliore progressivement
+                                grâce à ce processus d'apprentissage.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Témoignages ou statistiques -->
+    <div class="row mt-5 mb-3">
+        <div class="col-12 text-center">
+            <h2 class="mb-4">Pourquoi choisir notre plateforme</h2>
+        </div>
+    </div>
+    
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card text-center h-100 shadow-sm">
+                <div class="card-body">
+                    <i class="bi bi-clock text-primary mb-3" style="font-size: 2.5rem;"></i>
+                    <h3 class="card-title h4">Gain de temps</h3>
+                    <p class="card-text">
+                        Réduisez considérablement le temps passé à corriger les exercices grâce à l'automatisation
+                        pour vous concentrer sur ce qui compte vraiment : l'enseignement.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center h-100 shadow-sm">
+                <div class="card-body">
+                    <i class="bi bi-graph-up-arrow text-primary mb-3" style="font-size: 2.5rem;"></i>
+                    <h3 class="card-title h4">Analyse avancée</h3>
+                    <p class="card-text">
+                        Obtenez des insights précieux sur les performances des étudiants grâce à nos outils d'analyse
+                        et visualisations avancées pour une pédagogie adaptative.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center h-100 shadow-sm">
+                <div class="card-body">
+                    <i class="bi bi-shield-check text-primary mb-3" style="font-size: 2.5rem;"></i>
+                    <h3 class="card-title h4">Fiabilité</h3>
+                    <p class="card-text">
+                        Notre système conjugue la puissance de l'IA et l'expertise humaine pour des évaluations
+                        justes, pertinentes et personnalisées pour chaque étudiant.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Appel à l'action -->
+    <div class="row mt-5">
+        <div class="col-lg-8 mx-auto text-center">
+            <h2 class="mb-4">Prêt à démarrer ?</h2>
+            <p class="lead mb-4">
+                Rejoignez notre plateforme dès maintenant et transformez votre expérience d'apprentissage et d'enseignement.
+            </p>
+            {% if user.is_authenticated %}
+                <a href="{% url 'dashboard:dashboard' %}" class="btn btn-lg btn-primary">
+                    Accéder à mon tableau de bord
+                </a>
+            {% else %}
+                <a href="{% url 'accounts:register' %}" class="btn btn-lg btn-primary me-3">
+                    Créer un compte
+                </a>
+                <a href="{% url 'accounts:login' %}" class="btn btn-lg btn-outline-primary">
+                    Se connecter
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
