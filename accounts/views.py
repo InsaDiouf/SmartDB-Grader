@@ -1,142 +1,206 @@
-from django.db import models
-from django.contrib.auth.models import AbstractUser, BaseUserManager
-from django.utils.translation import gettext_lazy as _
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth import login, authenticate, logout, update_session_auth_hash
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.db import transaction
+from django.urls import reverse
+from django.http import HttpResponseRedirect
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.views.generic import DetailView, UpdateView, ListView, FormView
+from django.contrib.auth import get_user_model
+
+from .forms import (
+    CustomUserCreationForm, CustomAuthenticationForm, UserProfileForm,
+    StudentProfileForm, TeacherProfileForm, CustomPasswordChangeForm
+)
+from .models import StudentProfile, TeacherProfile
+
+User = get_user_model()
 
 
-class UserManager(BaseUserManager):
-    """Define a model manager for User model with no username field."""
-
-    use_in_migrations = True
-
-    def _create_user(self, email, password, **extra_fields):
-        """Create and save a User with the given email and password."""
-        if not email:
-            raise ValueError('The given email must be set')
-        email = self.normalize_email(email)
-        user = self.model(email=email, **extra_fields)
-        user.set_password(password)
-        user.save(using=self._db)
-        return user
-
-    def create_user(self, email, password=None, **extra_fields):
-        """Create and save a regular User with the given email and password."""
-        extra_fields.setdefault('is_staff', False)
-        extra_fields.setdefault('is_superuser', False)
-        return self._create_user(email, password, **extra_fields)
-
-    def create_superuser(self, email, password, **extra_fields):
-        """Create and save a SuperUser with the given email and password."""
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
-
-        if extra_fields.get('is_staff') is not True:
-            raise ValueError('Superuser must have is_staff=True.')
-        if extra_fields.get('is_superuser') is not True:
-            raise ValueError('Superuser must have is_superuser=True.')
-
-        return self._create_user(email, password, **extra_fields)
+def register_view(request):
+    """Vue pour l'inscription d'un nouvel utilisateur."""
+    if request.method == 'POST':
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            with transaction.atomic():
+                # Créer l'utilisateur
+                user = form.save()
+                
+                # Créer le profil correspondant au type d'utilisateur
+                if user.is_student:
+                    StudentProfile.objects.create(user=user)
+                elif user.is_teacher:
+                    TeacherProfile.objects.create(user=user)
+                
+                # Connecter l'utilisateur
+                login(request, user)
+                messages.success(request, "Inscription réussie !")
+                
+                # Rediriger vers la page d'accueil
+                return redirect('home')
+    else:
+        form = CustomUserCreationForm()
+    
+    return render(request, 'accounts/register.html', {'form': form})
 
 
-class User(AbstractUser):
-    """Custom User model with email as username field."""
-
-    username = None
-    email = models.EmailField(_('email address'), unique=True)
+def login_view(request):
+    """Vue pour la connexion d'un utilisateur."""
+    if request.method == 'POST':
+        form = CustomAuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            email = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            user = authenticate(username=email, password=password)
+            
+            if user is not None:
+                login(request, user)
+                messages.success(request, f"Bienvenue, {user.get_full_name() or user.email} !")
+                
+                # Rediriger vers la page demandée ou la page d'accueil
+                next_page = request.GET.get('next', 'home')
+                return redirect(next_page)
+            else:
+                messages.error(request, "Identifiants invalides.")
+        else:
+            messages.error(request, "Erreur de connexion. Veuillez vérifier vos identifiants.")
+    else:
+        form = CustomAuthenticationForm()
     
-    # Type d'utilisateur
-    USER_TYPE_CHOICES = (
-        ('student', 'Étudiant'),
-        ('teacher', 'Professeur'),
-    )
-    user_type = models.CharField(
-        max_length=10, 
-        choices=USER_TYPE_CHOICES, 
-        default='student'
-    )
-    
-    # Champs supplémentaires
-    profile_picture = models.ImageField(
-        upload_to='profile_pics/', 
-        blank=True, 
-        null=True
-    )
-    bio = models.TextField(max_length=500, blank=True)
-    
-    # OAuth information
-    oauth_provider = models.CharField(max_length=20, blank=True, null=True)
-    oauth_uid = models.CharField(max_length=100, blank=True, null=True)
-    
-    # Dates importantes
-    date_joined = models.DateTimeField(auto_now_add=True)
-    last_login = models.DateTimeField(auto_now=True)
-    
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = []
-
-    objects = UserManager()
-
-    def __str__(self):
-        return self.email
-    
-    def get_full_name(self):
-        return f"{self.first_name} {self.last_name}"
-    
-    @property
-    def is_student(self):
-        return self.user_type == 'student'
-    
-    @property
-    def is_teacher(self):
-        return self.user_type == 'teacher'
+    return render(request, 'accounts/login.html', {'form': form})
 
 
-class StudentProfile(models.Model):
-    """Profile for student users with additional information."""
-    
-    user = models.OneToOneField(
-        User, 
-        on_delete=models.CASCADE, 
-        related_name='student_profile'
-    )
-    
-    # Informations académiques
-    student_id = models.CharField(max_length=20, blank=True, null=True)
-    academic_year = models.CharField(max_length=20, blank=True, null=True)
-    specialization = models.CharField(max_length=100, blank=True, null=True)
-    
-    # Statistiques
-    exercises_completed = models.IntegerField(default=0)
-    average_score = models.FloatField(default=0.0)
-    
-    # Métadonnées
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return f"Profile de {self.user.email}"
+def logout_view(request):
+    """Vue pour la déconnexion d'un utilisateur."""
+    logout(request)
+    messages.success(request, "Vous avez été déconnecté avec succès.")
+    return redirect('home')
 
 
-class TeacherProfile(models.Model):
-    """Profile for teacher users with additional information."""
+@login_required
+def profile_view(request):
+    """Vue pour afficher le profil de l'utilisateur connecté."""
+    user = request.user
     
-    user = models.OneToOneField(
-        User, 
-        on_delete=models.CASCADE, 
-        related_name='teacher_profile'
-    )
+    # Déterminer le type de profil
+    context = {
+        'user': user,
+        'is_student': user.is_student,
+        'is_teacher': user.is_teacher,
+    }
     
-    # Informations professionnelles
-    department = models.CharField(max_length=100, blank=True, null=True)
-    title = models.CharField(max_length=100, blank=True, null=True)
-    specializations = models.CharField(max_length=200, blank=True, null=True)
+    # Ajouter les informations spécifiques au profil
+    if user.is_student and hasattr(user, 'student_profile'):
+        context['profile'] = user.student_profile
+    elif user.is_teacher and hasattr(user, 'teacher_profile'):
+        context['profile'] = user.teacher_profile
     
-    # Statistiques
-    exercises_created = models.IntegerField(default=0)
-    students_taught = models.IntegerField(default=0)
+    return render(request, 'accounts/profile.html', context)
+
+
+@login_required
+def edit_profile_view(request):
+    """Vue pour modifier le profil de l'utilisateur connecté."""
+    user = request.user
     
-    # Métadonnées
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # Préparer les formulaires appropriés
+    if request.method == 'POST':
+        # Formulaire du profil de base
+        user_form = UserProfileForm(request.POST, request.FILES, instance=user)
+        
+        # Formulaire spécifique au type d'utilisateur
+        if user.is_student and hasattr(user, 'student_profile'):
+            profile_form = StudentProfileForm(request.POST, instance=user.student_profile)
+        elif user.is_teacher and hasattr(user, 'teacher_profile'):
+            profile_form = TeacherProfileForm(request.POST, instance=user.teacher_profile)
+        else:
+            profile_form = None
+        
+        # Validation et enregistrement
+        if user_form.is_valid() and (profile_form is None or profile_form.is_valid()):
+            with transaction.atomic():
+                user_form.save()
+                if profile_form:
+                    profile_form.save()
+                messages.success(request, "Profil mis à jour avec succès !")
+                return redirect('accounts:profile')
+        else:
+            messages.error(request, "Erreur lors de la mise à jour du profil.")
+    else:
+        # Initialiser les formulaires
+        user_form = UserProfileForm(instance=user)
+        
+        if user.is_student and hasattr(user, 'student_profile'):
+            profile_form = StudentProfileForm(instance=user.student_profile)
+        elif user.is_teacher and hasattr(user, 'teacher_profile'):
+            profile_form = TeacherProfileForm(instance=user.teacher_profile)
+        else:
+            profile_form = None
     
-    def __str__(self):
-        return f"Profile de Prof. {self.user.get_full_name()}"
+    context = {
+        'user_form': user_form,
+        'profile_form': profile_form,
+        'is_student': user.is_student,
+        'is_teacher': user.is_teacher,
+    }
+    
+    return render(request, 'accounts/edit_profile.html', context)
+
+
+@login_required
+def change_password_view(request):
+    """Vue pour changer le mot de passe de l'utilisateur."""
+    if request.method == 'POST':
+        form = CustomPasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            # Mise à jour de la session pour éviter la déconnexion
+            update_session_auth_hash(request, user)
+            messages.success(request, "Votre mot de passe a été mis à jour avec succès !")
+            return redirect('accounts:profile')
+        else:
+            messages.error(request, "Erreur lors du changement de mot de passe.")
+    else:
+        form = CustomPasswordChangeForm(request.user)
+    
+    return render(request, 'accounts/change_password.html', {'form': form})
+
+
+class TeacherRequiredMixin(UserPassesTestMixin):
+    """Mixin pour restreindre l'accès aux professeurs uniquement."""
+    
+    def test_func(self):
+        return self.request.user.is_authenticated and self.request.user.is_teacher
+
+
+class StudentListView(LoginRequiredMixin, TeacherRequiredMixin, ListView):
+    """Vue pour afficher la liste des étudiants (pour les professeurs)."""
+    
+    model = User
+    template_name = 'accounts/student_list.html'
+    context_object_name = 'students'
+    
+    def get_queryset(self):
+        return User.objects.filter(user_type='student')
+
+
+class StudentDetailView(LoginRequiredMixin, TeacherRequiredMixin, DetailView):
+    """Vue pour afficher les détails d'un étudiant (pour les professeurs)."""
+    
+    model = User
+    template_name = 'accounts/student_detail.html'
+    context_object_name = 'student'
+    
+    def get_queryset(self):
+        return User.objects.filter(user_type='student')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        student = self.get_object()
+        
+        # Ajouter les informations sur les exercices et les soumissions
+        context['submissions'] = student.submissions.all().order_by('-submitted_at')
+        context['assignments'] = student.assigned_exercises.all()
+        
+        return context
