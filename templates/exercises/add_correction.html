@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Ajouter une correction - {{ exercise.title }} - Plateforme d'Évaluation Automatisée{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Ajouter une correction</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Informations sur l'exercice -->
+                    <div class="alert alert-info mb-4">
+                        <h5 class="alert-heading">
+                            <i class="bi bi-info-circle me-2"></i>Exercice : {{ exercise.title }}
+                        </h5>
+                        <p class="mb-1">Catégorie : {{ exercise.topic.name }}</p>
+                        <p class="mb-1">Difficulté : {{ exercise.difficulty.name }}</p>
+                        <p class="mb-0">
+                            <a href="{% url 'exercises:exercise_detail' pk=exercise.id %}" class="alert-link small">
+                                Voir l'exercice complet
+                            </a>
+                        </p>
+                    </div>
+                    
+                    <!-- Formulaire de correction -->
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <h5 class="mb-3">Contenu de la correction</h5>
+                        <div class="mb-4">
+                            {{ form.text_content|as_crispy_field }}
+                        </div>
+                        
+                        <h5 class="mb-3">Fichier (optionnel)</h5>
+                        <div class="mb-4">
+                            {{ form.file|as_crispy_field }}
+                            <small class="form-text text-muted">Format accepté : PDF. Taille max : 5 Mo.</small>
+                        </div>
+                        
+                        <h5 class="mb-3">Options</h5>
+                        <div class="mb-4">
+                            <div class="form-check">
+                                {{ form.is_primary }}
+                                <label class="form-check-label" for="{{ form.is_primary.id_for_label }}">
+                                    Définir comme correction principale
+                                </label>
+                            </div>
+                            <small class="form-text text-muted">
+                                {% if exercise.corrections.filter(is_primary=True).exists %}
+                                    Une correction principale existe déjà. Si vous cochez cette option, elle remplacera la correction principale actuelle.
+                                {% else %}
+                                    Si coché, cette correction sera utilisée comme référence principale pour l'évaluation automatique.
+                                {% endif %}
+                            </small>
+                        </div>
+                        
+                        <!-- Boutons de soumission -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'exercises:exercise_detail' pk=exercise.id %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Retour à l'exercice
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check2-circle me-2"></i>Ajouter la correction
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Conseils pour une bonne correction -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Conseils pour une correction efficace</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-check-circle text-success me-2"></i>Structure claire</h6>
+                            <p class="small text-muted">Organisez votre correction en sections distinctes correspondant aux différentes parties de l'exercice.</p>
+                            
+                            <h6><i class="bi bi-check-circle text-success me-2"></i>Critères d'évaluation</h6>
+                            <p class="small text-muted">Précisez les critères d'évaluation et le barème de notation pour faciliter l'évaluation automatique.</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-check-circle text-success me-2"></i>Explications détaillées</h6>
+                            <p class="small text-muted">Fournissez des explications claires pour chaque étape de la solution, pas uniquement les réponses.</p>
+                            
+                            <h6><i class="bi bi-check-circle text-success me-2"></i>Approches alternatives</h6>
+                            <p class="small text-muted">Si pertinent, mentionnez différentes approches valables pour résoudre l'exercice.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Validation du formulaire
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function(e) {
+            const textContent = document.getElementById('{{ form.text_content.id_for_label }}').value.trim();
+            const fileInput = document.getElementById('{{ form.file.id_for_label }}');
+            
+            // Vérifier qu'au moins un des deux champs est rempli
+            if (textContent === '' && fileInput.files.length === 0) {
+                e.preventDefault();
+                alert('Veuillez fournir soit un contenu texte, soit un fichier PDF.');
+            }
+        });
+    });
+</script>
+{% endblock %}

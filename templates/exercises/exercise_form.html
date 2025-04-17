@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if form.instance.pk %}
+        Modifier l'exercice - {{ form.instance.title }}
+    {% else %}
+        Créer un nouvel exercice
+    {% endif %}
+    - Plateforme d'Évaluation Automatisée
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        {% if form.instance.pk %}
+                            Modifier l'exercice
+                        {% else %}
+                            Créer un nouvel exercice
+                        {% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <!-- Informations de base -->
+                        <h5 class="mb-3">Informations de base</h5>
+                        <div class="mb-3">
+                            {{ form.title|as_crispy_field }}
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                {{ form.topic|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.difficulty|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            {{ form.description|as_crispy_field }}
+                        </div>
+                        
+                        <!-- Paramètres de l'exercice -->
+                        <h5 class="mb-3">Paramètres</h5>
+                        <div class="row">
+                            <div class="col-md-4">
+                                {{ form.time_limit_minutes|as_crispy_field }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.max_attempts|as_crispy_field }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.total_points|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <!-- Fichier d'exercice -->
+                        <h5 class="mb-3">Fichier</h5>
+                        <div class="mb-4">
+                            {{ form.file|as_crispy_field }}
+                            <small class="form-text text-muted">Format accepté : PDF. Taille max : 5 Mo.</small>
+                            
+                            {% if form.instance.file %}
+                                <div class="mt-2">
+                                    <div class="alert alert-info d-flex align-items-center" role="alert">
+                                        <i class="bi bi-file-earmark-pdf me-2"></i>
+                                        <div>
+                                            Fichier actuel: <a href="{{ form.instance.file.url }}" target="_blank">{{ form.instance.file.name|default:"fichier.pdf" }}</a>
+                                            <div class="form-check mt-1">
+                                                <input class="form-check-input" type="checkbox" id="remove_file" name="remove_file">
+                                                <label class="form-check-label" for="remove_file">
+                                                    Supprimer le fichier actuel
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Options de publication -->
+                        <h5 class="mb-3">Publication</h5>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.is_published }}
+                                <label class="form-check-label" for="{{ form.is_published.id_for_label }}">
+                                    Publier immédiatement
+                                </label>
+                            </div>
+                            <small class="form-text text-muted">Si coché, l'exercice sera visible par les étudiants assignés.</small>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                {{ form.publication_date|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.deadline|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <!-- Boutons de soumission -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'exercises:exercise_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Retour à la liste
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                {% if form.instance.pk %}
+                                    <i class="bi bi-save me-2"></i>Enregistrer les modifications
+                                {% else %}
+                                    <i class="bi bi-plus-circle me-2"></i>Créer l'exercice
+                                {% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Gestion de l'affichage des champs de date selon l'état de publication
+        const isPublishedCheckbox = document.getElementById('{{ form.is_published.id_for_label }}');
+        const publicationDateGroup = document.getElementById('div_{{ form.publication_date.id_for_label }}');
+        
+        function updateFieldsVisibility() {
+            if (isPublishedCheckbox.checked) {
+                publicationDateGroup.style.display = 'block';
+            } else {
+                publicationDateGroup.style.display = 'none';
+            }
+        }
+        
+        // Initialisation
+        updateFieldsVisibility();
+        
+        // Mise à jour lorsque la case est cochée/décochée
+        isPublishedCheckbox.addEventListener('change', updateFieldsVisibility);
+        
+        // Validation du formulaire
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function(e) {
+            // Vérifier que la date limite est postérieure à la date de publication
+            const publicationDate = new Date(document.getElementById('{{ form.publication_date.id_for_label }}').value);
+            const deadlineDate = new Date(document.getElementById('{{ form.deadline.id_for_label }}').value);
+            
+            if (!isNaN(publicationDate.getTime()) && !isNaN(deadlineDate.getTime())) {
+                if (deadlineDate <= publicationDate) {
+                    e.preventDefault();
+                    alert('La date limite doit être postérieure à la date de publication.');
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}
