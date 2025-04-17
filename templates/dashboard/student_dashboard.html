@@ -1,0 +1,103 @@
+document.addEventListener('DOMContentLoaded', function() {
+    // Graphique d'évolution des notes
+    const evolutionCtx = document.getElementById('scoresEvolutionChart').getContext('2d');
+    
+    const evolutionData = {
+        labels: [
+            {% for score in scores_by_month %}
+                "{% if score.month == 1 %}Janvier{% elif score.month == 2 %}Février{% elif score.month == 3 %}Mars{% elif score.month == 4 %}Avril{% elif score.month == 5 %}Mai{% elif score.month == 6 %}Juin{% elif score.month == 7 %}Juillet{% elif score.month == 8 %}Août{% elif score.month == 9 %}Septembre{% elif score.month == 10 %}Octobre{% elif score.month == 11 %}Novembre{% elif score.month == 12 %}Décembre{% endif %}",
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Note moyenne sur 20',
+            data: [
+                {% for score in scores_by_month %}
+                    {{ score.avg_score|floatformat:1 }},
+                {% endfor %}
+            ],
+            borderColor: '#4361ee',
+            backgroundColor: 'rgba(67, 97, 238, 0.1)',
+            tension: 0.3,
+            fill: true
+        }]
+    };
+    
+    new Chart(evolutionCtx, {
+        type: 'line',
+        data: evolutionData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 20,
+                    title: {
+                        display: true,
+                        text: 'Note sur 20'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            }
+        }
+    });
+    
+    // Graphique de performance par catégorie
+    const categoryCtx = document.getElementById('categoryPerformanceChart').getContext('2d');
+    
+    // Ces données devraient être générées par le backend
+    // Exemple de données fictives pour la démo
+    const categoryData = {
+        labels: ['Bases de données', 'SQL', 'Modélisation', 'NoSQL', 'Optimisation'],
+        datasets: [{
+            label: 'Note moyenne',
+            data: [16.5, 14.2, 12.8, 15.0, 13.5],
+            backgroundColor: [
+                'rgba(67, 97, 238, 0.6)',
+                'rgba(72, 149, 239, 0.6)',
+                'rgba(76, 201, 240, 0.6)',
+                'rgba(114, 9, 183, 0.6)',
+                'rgba(247, 37, 133, 0.6)'
+            ],
+            borderColor: [
+                'rgb(67, 97, 238)',
+                'rgb(72, 149, 239)',
+                'rgb(76, 201, 240)',
+                'rgb(114, 9, 183)',
+                'rgb(247, 37, 133)'
+            ],
+            borderWidth: 1
+        }]
+    };
+    
+    new Chart(categoryCtx, {
+        type: 'radar',
+        data: categoryData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 20,
+                    ticks: {
+                        stepSize: 5
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+});

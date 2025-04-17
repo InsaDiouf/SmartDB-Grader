@@ -1,0 +1,158 @@
+document.addEventListener('DOMContentLoaded', function() {
+    // Distribution des notes
+    const scoreDistributionCtx = document.getElementById('scoreDistributionChart').getContext('2d');
+    
+    const scoreDistributionData = {
+        labels: ['0-20%', '20-40%', '40-60%', '60-80%', '80-100%'],
+        datasets: [{
+            label: 'Nombre d\'étudiants',
+            data: [
+                {% for item in score_distribution %}
+                    {{ item.count }},
+                {% empty %}
+                    0, 0, 0, 0, 0
+                {% endfor %}
+            ],
+            backgroundColor: [
+                'rgba(220, 53, 69, 0.6)',
+                'rgba(255, 193, 7, 0.6)',
+                'rgba(13, 202, 240, 0.6)',
+                'rgba(25, 135, 84, 0.6)',
+                'rgba(25, 135, 84, 0.8)'
+            ],
+            borderColor: [
+                'rgb(220, 53, 69)',
+                'rgb(255, 193, 7)',
+                'rgb(13, 202, 240)',
+                'rgb(25, 135, 84)',
+                'rgb(25, 135, 84)'
+            ],
+            borderWidth: 1
+        }]
+    };
+    
+    new Chart(scoreDistributionCtx, {
+        type: 'bar',
+        data: scoreDistributionData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(tooltipItems) {
+                            return 'Plage de notes: ' + tooltipItems[0].label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Activité quotidienne
+    const dailyActivityCtx = document.getElementById('dailyActivityChart').getContext('2d');
+    
+    const dailyActivityData = {
+        labels: [
+            {% for item in daily_activity %}
+                "{{ item.day|date:'d/m' }}",
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Soumissions',
+            data: [
+                {% for item in daily_activity %}
+                    {{ item.count }},
+                {% endfor %}
+            ],
+            borderColor: '#4361ee',
+            backgroundColor: 'rgba(67, 97, 238, 0.1)',
+            tension: 0.3,
+            fill: true
+        }]
+    };
+    
+    new Chart(dailyActivityCtx, {
+        type: 'line',
+        data: dailyActivityData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+    
+    // Performance par catégorie
+    const categoryPerformanceCtx = document.getElementById('categoryPerformanceChart').getContext('2d');
+    
+    // Ces données devraient être générées par le backend
+    const categoryData = {
+        labels: [
+            {% for topic in topics %}
+                "{{ topic.name }}",
+            {% empty %}
+                "Bases de données", "SQL", "Modélisation", "NoSQL", "Optimisation"
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Note moyenne',
+            data: [
+                {% for topic in topic_performance %}
+                    {{ topic.avg_score|floatformat:1 }},
+                {% empty %}
+                    16.5, 14.2, 12.8, 15.0, 13.5
+                {% endfor %}
+            ],
+            backgroundColor: 'rgba(67, 97, 238, 0.6)',
+            borderColor: 'rgb(67, 97, 238)',
+            borderWidth: 1
+        }]
+    };
+    
+    new Chart(categoryPerformanceCtx, {
+        type: 'bar',
+        data: categoryData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 20,
+                    title: {
+                        display: true,
+                        text: 'Note moyenne'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+});
