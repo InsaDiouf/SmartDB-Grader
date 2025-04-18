@@ -175,5 +175,22 @@
                             <span aria-hidden="true">&raquo;&raquo;</span>
                         </a>
                     </li>
-                {% else %}
+                {% endif %}
+                
+                {% if not page_obj.has_next %}
                     <li class="page-item disabled">
+                        <a class="page-link" href="#" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item disabled">
+                        <a class="page-link" href="#" aria-label="Last">
+                            <span aria-hidden="true">&raquo;&raquo;</span>
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</div>
+{% endblock %}

@@ -18,8 +18,8 @@ urlpatterns = [
     path('dashboard/', include('dashboard.urls')),
     
     # OAuth (seulement si django-allauth est configuré)
-    path('oauth/', include('allauth.urls')),
-]
+    path('accounts/', include('accounts.urls')),
+    path('accounts/', include('allauth.urls')),]
 
 # Ajouter les routes pour servir les médias en développement
 if settings.DEBUG:

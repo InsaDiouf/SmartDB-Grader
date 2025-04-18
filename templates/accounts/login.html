@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load socialaccount %}
 
 {% block title %}Connexion - Plateforme d'Évaluation Automatisée{% endblock %}
 
@@ -33,13 +34,13 @@
                     
                     <!-- OAuth providers -->
                     <div class="d-grid gap-2">
-                        <a href="{% url 'oauth:google' %}" class="btn btn-outline-danger">
+                        <a href="{% provider_login_url 'google' %}" class="btn btn-outline-danger">
                             <i class="bi bi-google me-2"></i>Connexion avec Google
                         </a>
-                        <a href="{% url 'oauth:github' %}" class="btn btn-outline-dark">
+                        <a href="{% provider_login_url 'github' %}" class="btn btn-outline-dark">
                             <i class="bi bi-github me-2"></i>Connexion avec GitHub
                         </a>
-                        <a href="{% url 'oauth:microsoft' %}" class="btn btn-outline-primary">
+                        <a href="{% provider_login_url 'microsoft' %}" class="btn btn-outline-primary">
                             <i class="bi bi-microsoft me-2"></i>Connexion avec Microsoft
                         </a>
                     </div>

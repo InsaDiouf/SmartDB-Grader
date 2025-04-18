@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Avg, Max, Min, Sum, Q, F
+from django.db.models import Count, Avg, Max, Min, Sum, Q, F, Value, Case, When, CharField
+from django.db.models.functions import TruncDate, Extract
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.http import JsonResponse
@@ -51,22 +52,34 @@ def student_dashboard(request):
     
     # Calculer la note moyenne si des évaluations existent
     evaluations = Evaluation.objects.filter(submission__student=student)
-    avg_score = evaluations.aggregate(avg=Avg('score_out_of_20'))['avg'] or 0
+    # Utiliser le champ score au lieu de score_out_of_20
+    avg_score_raw = evaluations.aggregate(avg=Avg('score'))['avg'] or 0
+    # Si score est sur 1.0, convertir en note sur 20
+    avg_score = avg_score_raw * 20 if avg_score_raw <= 1.0 else avg_score_raw
     
     # Progression dans le temps (pour les graphiques)
     submissions_by_month = Submission.objects.filter(
         student=student
-    ).extra(
-        select={'month': "EXTRACT(month FROM submitted_at)"}
+    ).annotate(
+        month=Extract('submitted_at', 'month')
     ).values('month').annotate(
         count=Count('id')
     ).order_by('month')
     
-    scores_by_month = evaluations.extra(
-        select={'month': "EXTRACT(month FROM created_at)"}
+    # Utiliser score au lieu de score_out_of_20
+    scores_by_month = evaluations.annotate(
+        month=Extract('created_at', 'month')
     ).values('month').annotate(
-        avg_score=Avg('score_out_of_20')
+        avg_score_raw=Avg('score')
     ).order_by('month')
+    
+    # Convertir les valeurs après récupération des données
+    scores_by_month_converted = []
+    for data in scores_by_month:
+        score_raw = data['avg_score_raw'] or 0
+        # Si score est sur 1.0, convertir en note sur 20
+        data['avg_score'] = score_raw * 20 if score_raw <= 1.0 else score_raw
+        scores_by_month_converted.append(data)
     
     context = {
         'current_assignments': current_assignments,
@@ -74,7 +87,7 @@ def student_dashboard(request):
         'total_submissions': total_submissions,
         'avg_score': round(avg_score, 2) if avg_score else 0,
         'submissions_by_month': list(submissions_by_month),
-        'scores_by_month': list(scores_by_month),
+        'scores_by_month': scores_by_month_converted,
     }
     
     return render(request, 'dashboard/student_dashboard.html', context)
@@ -104,22 +117,21 @@ def teacher_dashboard(request):
     
     # Taux moyen de réussite
     avg_score_pct = Evaluation.objects.filter(
-        submission_exercise_author=teacher
+        submission__exercise__author=teacher
     ).aggregate(avg=Avg('percentage'))['avg'] or 0
     
     # Distribution des notes (pour graphiques)
     score_distribution = Evaluation.objects.filter(
-        submission_exercise_author=teacher
-    ).extra(
-        select={'range': """
-            CASE
-                WHEN percentage < 20 THEN '0-20%'
-                WHEN percentage < 40 THEN '20-40%'
-                WHEN percentage < 60 THEN '40-60%'
-                WHEN percentage < 80 THEN '60-80%'
-                ELSE '80-100%'
-            END
-        """}
+        submission__exercise__author=teacher
+    ).annotate(
+        range=Case(
+            When(percentage__lt=20, then=Value('0-20%')),
+            When(percentage__lt=40, then=Value('20-40%')),
+            When(percentage__lt=60, then=Value('40-60%')),
+            When(percentage__lt=80, then=Value('60-80%')),
+            default=Value('80-100%'),
+            output_field=CharField(),
+        )
     ).values('range').annotate(count=Count('id')).order_by('range')
     
     # Activité par jour (derniers 30 jours)
@@ -127,8 +139,8 @@ def teacher_dashboard(request):
     daily_activity = Submission.objects.filter(
         exercise__author=teacher,
         submitted_at__gte=thirty_days_ago
-    ).extra(
-        select={'day': "DATE(submitted_at)"}
+    ).annotate(
+        day=TruncDate('submitted_at')
     ).values('day').annotate(count=Count('id')).order_by('day')
     
     context = {
@@ -166,16 +178,15 @@ def exercise_stats_view(request, exercise_id):
     # Ajouter des statistiques de répartition
     score_distribution = Evaluation.objects.filter(
         submission__exercise_id=exercise_id
-    ).extra(
-        select={'range': """
-            CASE
-                WHEN percentage < 20 THEN '0-20%'
-                WHEN percentage < 40 THEN '20-40%'
-                WHEN percentage < 60 THEN '40-60%'
-                WHEN percentage < 80 THEN '60-80%'
-                ELSE '80-100%'
-            END
-        """}
+    ).annotate(
+        range=Case(
+            When(percentage__lt=20, then=Value('0-20%')),
+            When(percentage__lt=40, then=Value('20-40%')),
+            When(percentage__lt=60, then=Value('40-60%')),
+            When(percentage__lt=80, then=Value('60-80%')),
+            default=Value('80-100%'),
+            output_field=CharField(),
+        )
     ).values('range').annotate(count=Count('id')).order_by('range')
     
     # Formater les statistiques
