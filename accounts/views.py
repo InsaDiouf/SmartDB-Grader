@@ -33,8 +33,8 @@ def register_view(request):
                 elif user.is_teacher:
                     TeacherProfile.objects.create(user=user)
                 
-                # Connecter l'utilisateur
-                login(request, user)
+                # Connecter l'utilisateur avec le backend spécifié
+                login(request, user, backend='django.contrib.auth.backends.ModelBackend')
                 messages.success(request, "Inscription réussie !")
                 
                 # Rediriger vers la page d'accueil
@@ -55,7 +55,7 @@ def login_view(request):
             user = authenticate(username=email, password=password)
             
             if user is not None:
-                login(request, user)
+                login(request, user, backend='django.contrib.auth.backends.ModelBackend')
                 messages.success(request, f"Bienvenue, {user.get_full_name() or user.email} !")
                 
                 # Rediriger vers la page demandée ou la page d'accueil

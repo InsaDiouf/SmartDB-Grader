@@ -64,6 +64,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
+    'allauth.account.middleware.AccountMiddleware',  # Ajoutez cette ligne
+
 ]
 
 ROOT_URLCONF = 'dbeval.urls'
