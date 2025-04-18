@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Soumettre une réponse - {{ exercise.title }} - Plateforme d'Évaluation Automatisée{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Soumettre une réponse</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Informations sur l'exercice -->
+                    <div class="alert alert-info mb-4">
+                        <h5 class="alert-heading">
+                            <i class="bi bi-info-circle me-2"></i>Exercice : {{ exercise.title }}
+                        </h5>
+                        <div class="d-flex align-items-center mb-1">
+                            <span class="badge {% if exercise.difficulty.value == 1 %}bg-success{% elif exercise.difficulty.value == 2 %}bg-info{% elif exercise.difficulty.value == 3 %}bg-warning{% elif exercise.difficulty.value == 4 %}bg-danger{% else %}bg-secondary{% endif %} me-2">
+                                {{ exercise.difficulty.name }}
+                            </span>
+                            <span class="badge bg-secondary me-2">{{ exercise.topic.name }}</span>
+                            <span class="small text-muted">{{ exercise.total_points }} points</span>
+                        </div>
+                        <p class="mb-0">
+                            <a href="{% url 'exercises:exercise_detail' pk=exercise.id %}" class="alert-link small">
+                                Voir l'exercice complet
+                            </a>
+                        </p>
+                    </div>
+                    
+                    <!-- Informations importantes -->
+                    <div class="alert alert-warning mb-4">
+                        <h5 class="alert-heading">
+                            <i class="bi bi-exclamation-triangle me-2"></i>Informations importantes
+                        </h5>
+                        <p class="mb-1">
+                            <strong>Tentative :</strong> {{ existing_submissions.count|add:1 }}/{{ exercise.max_attempts }}
+                        </p>
+                        
+                        {% if exercise.deadline %}
+                            <p class="mb-1">
+                                <strong>Date limite :</strong> {{ exercise.deadline|date:"d/m/Y H:i" }}
+                            </p>
+                        {% endif %}
+                        
+                        <p class="mb-0">
+                            <strong>Format accepté :</strong> Fichier PDF uniquement (max. 5 Mo)
+                        </p>
+                    </div>
+                    
+                    <!-- Formulaire de soumission -->
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <div class="custom-file-upload">
+                                <div class="mb-3">
+                                    <label for="{{ form.file.id_for_label }}" class="form-label">Votre réponse (fichier PDF)</label>
+                                    <div class="input-group">
+                                        {{ form.file }}
+                                    </div>
+                                </div>
+                                <div id="filePreview" class="border rounded p-3 text-center d-none mb-3">
+                                    <i class="bi bi-file-earmark-pdf text-danger" style="font-size: 2rem;"></i>
+                                    <p id="fileName" class="mt-2 mb-0"></p>
+                                    <button type="button" id="removeFile" class="btn btn-sm btn-outline-danger mt-2">
+                                        <i class="bi bi-x-circle me-1"></i>Supprimer
+                                    </button>
+                                </div>
+                                <div id="dragDropArea" class="border border-dashed rounded p-5 text-center mb-3">
+                                    <i class="bi bi-cloud-arrow-up text-primary" style="font-size: 3rem;"></i>
+                                    <h5 class="mt-3">Glissez et déposez votre fichier PDF ici</h5>
+                                    <p class="text-muted">ou</p>
+                                    <button type="button" id="browseButton" class="btn btn-outline-primary">
+                                        <i class="bi bi-folder me-2"></i>Parcourir les fichiers
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {% if form.file.errors %}
+                                <div class="alert alert-danger mt-2">
+                                    {{ form.file.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Boutons de soumission -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'exercises:exercise_detail' pk=exercise.id %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Retour à l'exercice
+                            </a>
+                            <button type="submit" id="submitButton" class="btn btn-primary" disabled>
+                                <i class="bi bi-upload me-2"></i>Soumettre ma réponse
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Tentatives précédentes -->
+            {% if existing_submissions %}
+                <div class="card shadow-sm mt-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Tentatives précédentes</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Tentative</th>
+                                        <th>Date</th>
+                                        <th>Statut</th>
+                                        <th>Note</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for submission in existing_submissions %}
+                                        <tr>
+                                            <td>#{{ submission.attempt_number }}</td>
+                                            <td>{{ submission.submitted_at|date:"d/m/Y H:i" }}</td>
+                                            <td>
+                                                {% if submission.status == 'pending' %}
+                                                    <span class="badge bg-warning">En attente</span>
+                                                {% elif submission.status == 'processing' %}
+                                                    <span class="badge bg-info">En traitement</span>
+                                                {% elif submission.status == 'completed' %}
+                                                    <span class="badge bg-success">Complété</span>
+                                                {% else %}
+                                                    <span class="badge bg-danger">Erreur</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if submission.evaluation %}
+                                                    <span class="badge {% if submission.evaluation.score_out_of_20 >= 10 %}bg-success{% else %}bg-danger{% endif %}">
+                                                        {{ submission.evaluation.score_out_of_20|floatformat:1 }}/20
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">N/A</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'submissions:submission_detail' pk=submission.id %}" class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const fileInput = document.getElementById('{{ form.file.id_for_label }}');
+        const dragDropArea = document.getElementById('dragDropArea');
+        const filePreview = document.getElementById('filePreview');
+        const fileName = document.getElementById('fileName');
+        const removeFileBtn = document.getElementById('removeFile');
+        const browseButton = document.getElementById('browseButton');
+        const submitButton = document.getElementById('submitButton');
+        
+        // Masquer l'input file par défaut
+        fileInput.style.display = 'none';
+        
+        // Ouvrir le sélecteur de fichier quand on clique sur le bouton parcourir
+        browseButton.addEventListener('click', function() {
+            fileInput.click();
+        });
+        
+        // Gérer la sélection de fichier
+        fileInput.addEventListener('change', function() {
+            handleFiles(this.files);
+        });
+        
+        // Gérer le drag & drop
+        dragDropArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            dragDropArea.classList.add('border-primary');
+        });
+        
+        dragDropArea.addEventListener('dragleave', function() {
+            dragDropArea.classList.remove('border-primary');
+        });
+        
+        dragDropArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dragDropArea.classList.remove('border-primary');
+            handleFiles(e.dataTransfer.files);
+        });
+        
+        // Supprimer le fichier
+        removeFileBtn.addEventListener('click', function() {
+            fileInput.value = '';
+            dragDropArea.classList.remove('d-none');
+            filePreview.classList.add('d-none');
+            submitButton.disabled = true;
+        });
+        
+        // Fonction pour gérer les fichiers sélectionnés
+        function handleFiles(files) {
+            if (files.length > 0) {
+                const file = files[0];
+                
+                // Vérifier le type de fichier
+                if (file.type !== 'application/pdf') {
+                    alert('Seuls les fichiers PDF sont acceptés.');
+                    return;
+                }
+                
+                // Vérifier la taille du fichier (max 5 Mo)
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('La taille du fichier ne doit pas dépasser 5 Mo.');
+                    return;
+                }
+                
+                // Mettre à jour l'input file
+                fileInput.files = files;
+                
+                // Afficher le nom du fichier
+                fileName.textContent = file.name;
+                
+                // Afficher l'aperçu et masquer la zone de drop
+                dragDropArea.classList.add('d-none');
+                filePreview.classList.remove('d-none');
+                
+                // Activer le bouton de soumission
+                submitButton.disabled = false;
+            }
+        }
+        
+        // Validation du formulaire avant soumission
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function(e) {
+            if (!fileInput.files || fileInput.files.length === 0) {
+                e.preventDefault();
+                alert('Veuillez sélectionner un fichier PDF.');
+            }
+        });
+    });
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .border-dashed {
+        border-style: dashed !important;
+        border-width: 2px !important;
+    }
+    
+    #dragDropArea {
+        transition: all 0.3s;
+    }
+    
+    #dragDropArea:hover, #dragDropArea.border-primary {
+        background-color: rgba(var(--bs-primary-rgb), 0.05);
+        border-color: var(--bs-primary) !important;
+    }
+</style>
+{% endblock %}

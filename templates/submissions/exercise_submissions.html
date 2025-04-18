@@ -1,0 +1,609 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Soumissions pour {{ exercise.title }} - Plateforme d'Évaluation Automatisée{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <h2 class="mb-2">Soumissions pour {{ exercise.title }}</h2>
+            <p class="text-muted">
+                Consultez et gérez les soumissions des étudiants pour cet exercice.
+            </p>
+            <div class="d-flex align-items-center">
+                <span class="badge {% if exercise.difficulty.value == 1 %}bg-success{% elif exercise.difficulty.value == 2 %}bg-info{% elif exercise.difficulty.value == 3 %}bg-warning{% elif exercise.difficulty.value == 4 %}bg-danger{% else %}bg-secondary{% endif %} me-2">
+                    {{ exercise.difficulty.name }}
+                </span>
+                <span class="badge bg-secondary">{{ exercise.topic.name }}</span>
+                
+                {% if exercise.is_published %}
+                    <span class="badge bg-success ms-2">Publié</span>
+                {% else %}
+                    <span class="badge bg-secondary ms-2">Brouillon</span>
+                {% endif %}
+                
+                {% if exercise.deadline %}
+                    <span class="text-muted ms-3">
+                        <i class="bi bi-calendar-event me-1"></i>Date limite: {{ exercise.deadline|date:"d/m/Y H:i" }}
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+            <a href="{% url 'exercises:exercise_detail' pk=exercise.id %}" class="btn btn-outline-primary">
+                <i class="bi bi-arrow-left me-2"></i>Retour à l'exercice
+            </a>
+        </div>
+    </div>
+    
+    <!-- Statistiques -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h3 class="text-primary">{{ total_submissions }}</h3>
+                    <p class="text-muted mb-0">Soumissions totales</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h3 class="text-primary">{{ completed_evaluations }}</h3>
+                    <p class="text-muted mb-0">Évaluations terminées</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h3 class="text-primary">{{ average_score|default:"N/A" }}</h3>
+                    <p class="text-muted mb-0">Note moyenne /20</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="d-flex flex-column h-100 justify-content-center">
+                        <h6 class="text-muted mb-2">Plage de notes</h6>
+                        <div>
+                            <span class="badge bg-success px-2 me-1">Max: {{ max_score|default:"N/A" }}</span>
+                            <span class="badge bg-danger px-2">Min: {{ min_score|default:"N/A" }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filtres et recherche -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label for="studentFilter" class="form-label">Étudiant</label>
+                    <input type="text" id="studentFilter" name="student" class="form-control" placeholder="Nom ou email..." value="{{ request.GET.student }}">
+                </div>
+                <div class="col-md-4">
+                    <label for="statusFilter" class="form-label">Statut</label>
+                    <select id="statusFilter" name="status" class="form-select">
+                        <option value="">Tous les statuts</option>
+                        <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>En attente</option>
+                        <option value="processing" {% if request.GET.status == 'processing' %}selected{% endif %}>En traitement</option>
+                        <option value="completed" {% if request.GET.status == 'completed' %}selected{% endif %}>Complété</option>
+                        <option value="error" {% if request.GET.status == 'error' %}selected{% endif %}>Erreur</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="scoreFilter" class="form-label">Note</label>
+                    <select id="scoreFilter" name="score" class="form-select">
+                        <option value="">Toutes les notes</option>
+                        <option value="pass" {% if request.GET.score == 'pass' %}selected{% endif %}>≥ 10/20 (Réussite)</option>
+                        <option value="fail" {% if request.GET.score == 'fail' %}selected{% endif %}>< 10/20 (Échec)</option>
+                        <option value="no_grade" {% if request.GET.score == 'no_grade' %}selected{% endif %}>Sans note</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-filter me-2"></i>Filtrer
+                    </button>
+                    <a href="{% url 'submissions:exercise_submissions' exercise_id=exercise.id %}" class="btn btn-outline-secondary ms-2">
+                        <i class="bi bi-arrow-counterclockwise me-2"></i>Réinitialiser
+                    </a>
+                    <button type="button" class="btn btn-outline-success ms-2" id="exportCsvBtn">
+                        <i class="bi bi-file-earmark-excel me-2"></i>Exporter CSV
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Liste des soumissions -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            {% if submissions %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" id="submissionsTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Étudiant</th>
+                                <th>Date</th>
+                                <th>Tentative</th>
+                                <th>Statut</th>
+                                <th>Note</th>
+                                <th>Évaluation</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for submission in submissions %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'accounts:student_detail' pk=submission.student.id %}" class="text-decoration-none">
+                                            {{ submission.student.get_full_name|default:submission.student.email }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <div>{{ submission.submitted_at|date:"d/m/Y" }}</div>
+                                        <small class="text-muted">{{ submission.submitted_at|date:"H:i" }}</small>
+                                        {% if submission.is_late %}
+                                            <div>
+                                                <span class="badge bg-danger mt-1">En retard</span>
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ submission.attempt_number }}/{{ exercise.max_attempts }}</td>
+                                    <td>
+                                        {% if submission.status == 'pending' %}
+                                            <span class="badge bg-warning">En attente</span>
+                                        {% elif submission.status == 'processing' %}
+                                            <span class="badge bg-info">En traitement</span>
+                                        {% elif submission.status == 'completed' %}
+                                            <span class="badge bg-success">Complété</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Erreur</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if submission.evaluation %}
+                                            <span class="badge {% if submission.evaluation.score_out_of_20 >= 10 %}bg-success{% else %}bg-danger{% endif %}">
+                                                {{ submission.evaluation.score_out_of_20|floatformat:1 }}/20
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if submission.evaluation %}
+                                            {% if submission.evaluation.reviewed_by_teacher %}
+                                                <span class="badge bg-info">
+                                                    <i class="bi bi-check-circle me-1"></i>Révisée
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">
+                                                    <i class="bi bi-robot me-1"></i>Auto
+                                                </span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <a href="{% url 'submissions:submission_detail' pk=submission.id %}" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            {% if submission.file %}
+                                                <a href="{{ submission.file.url }}" class="btn btn-sm btn-outline-secondary" target="_blank">
+                                                    <i class="bi bi-file-earmark-pdf"></i>
+                                                </a>
+                                            {% endif %}
+                                            {% if submission.status == 'completed' %}
+                                                <a href="{% url 'submissions:evaluation_review' submission_id=submission.id %}" class="btn btn-sm btn-outline-info">
+                                                    <i class="bi bi-pencil-square"></i>
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <div class="text-muted">
+                        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                        <h4 class="mt-3">Aucune soumission trouvée</h4>
+                        <p>Aucun étudiant n'a encore soumis de réponse à cet exercice.</p>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Pagination -->
+    {% if is_paginated %}
+        <nav class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="First">
+                            <span aria-hidden="true">&laquo;&laquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <a class="page-link" href="#" aria-label="First">
+                            <span aria-hidden="true">&laquo;&laquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item disabled">
+                        <a class="page-link" href="#" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                {% endif %}
+                
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                        </li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Last">
+                            <span aria-hidden="true">&raquo;&raquo;</span>
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <a class="page-link" href="#" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item disabled">
+                        <a class="page-link" href="#" aria-label="Last">
+                            <span aria-hidden="true">&raquo;&raquo;</span>
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+    
+    <!-- Visualisations des données -->
+    <div class="row mt-4">
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Distribution des notes</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="scoresDistributionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Activité des soumissions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="submissionActivityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour l'export CSV -->
+<div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exportModalLabel">Exporter les données</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Sélectionnez les colonnes à inclure dans l'export :</p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="student" id="colStudent" checked>
+                            <label class="form-check-label" for="colStudent">
+                                Étudiant
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="email" id="colEmail" checked>
+                            <label class="form-check-label" for="colEmail">
+                                Email
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="date" id="colDate" checked>
+                            <label class="form-check-label" for="colDate">
+                                Date de soumission
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="attempt" id="colAttempt" checked>
+                            <label class="form-check-label" for="colAttempt">
+                                Numéro de tentative
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="status" id="colStatus" checked>
+                            <label class="form-check-label" for="colStatus">
+                                Statut
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="score" id="colScore" checked>
+                            <label class="form-check-label" for="colScore">
+                                Note
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="feedback" id="colFeedback" checked>
+                            <label class="form-check-label" for="colFeedback">
+                                Feedback général
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="late" id="colLate" checked>
+                            <label class="form-check-label" for="colLate">
+                                En retard
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" id="downloadCsvBtn">
+                    <i class="bi bi-download me-2"></i>Télécharger CSV
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Graphique de distribution des notes
+        const scoresCtx = document.getElementById('scoresDistributionChart').getContext('2d');
+        
+        const scoresData = {
+            labels: ['0-20%', '20-40%', '40-60%', '60-80%', '80-100%'],
+            datasets: [{
+                label: 'Nombre d\'étudiants',
+                data: [
+                    {% for item in score_distribution %}
+                        {{ item.count }},
+                    {% empty %}
+                        0, 0, 0, 0, 0
+                    {% endfor %}
+                ],
+                backgroundColor: [
+                    'rgba(220, 53, 69, 0.6)',
+                    'rgba(255, 193, 7, 0.6)',
+                    'rgba(13, 202, 240, 0.6)',
+                    'rgba(25, 135, 84, 0.6)',
+                    'rgba(25, 135, 84, 0.8)'
+                ],
+                borderColor: [
+                    'rgb(220, 53, 69)',
+                    'rgb(255, 193, 7)',
+                    'rgb(13, 202, 240)',
+                    'rgb(25, 135, 84)',
+                    'rgb(25, 135, 84)'
+                ],
+                borderWidth: 1
+            }]
+        };
+        
+        new Chart(scoresCtx, {
+            type: 'bar',
+            data: scoresData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(tooltipItems) {
+                                return 'Plage de notes: ' + tooltipItems[0].label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Graphique d'activité des soumissions
+        const activityCtx = document.getElementById('submissionActivityChart').getContext('2d');
+        
+        const activityData = {
+            labels: [
+                {% for item in daily_activity %}
+                    "{{ item.day|date:'d/m' }}",
+                {% endfor %}
+            ],
+            datasets: [{
+                label: 'Soumissions',
+                data: [
+                    {% for item in daily_activity %}
+                        {{ item.count }},
+                    {% endfor %}
+                ],
+                borderColor: '#4361ee',
+                backgroundColor: 'rgba(67, 97, 238, 0.1)',
+                tension: 0.3,
+                fill: true
+            }]
+        };
+        
+        new Chart(activityCtx, {
+            type: 'line',
+            data: activityData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+        
+        // Gestion de l'export CSV
+        document.getElementById('exportCsvBtn').addEventListener('click', function() {
+            const modal = new bootstrap.Modal(document.getElementById('exportModal'));
+            modal.show();
+        });
+        
+        document.getElementById('downloadCsvBtn').addEventListener('click', function() {
+            // Récupérer les colonnes sélectionnées
+            const columns = [];
+            document.querySelectorAll('#exportModal input[type="checkbox"]:checked').forEach(function(checkbox) {
+                columns.push(checkbox.value);
+            });
+            
+            if (columns.length === 0) {
+                alert('Veuillez sélectionner au moins une colonne.');
+                return;
+            }
+            
+            // Générer le CSV
+            const table = document.getElementById('submissionsTable');
+            const rows = [];
+            
+            // En-têtes
+            const headers = [];
+            if (columns.includes('student')) headers.push('Étudiant');
+            if (columns.includes('email')) headers.push('Email');
+            if (columns.includes('date')) headers.push('Date');
+            if (columns.includes('attempt')) headers.push('Tentative');
+            if (columns.includes('status')) headers.push('Statut');
+            if (columns.includes('score')) headers.push('Note');
+            if (columns.includes('feedback')) headers.push('Feedback');
+            if (columns.includes('late')) headers.push('En retard');
+            
+            rows.push(headers.join(','));
+            
+            // Données
+            const tbody = table.querySelector('tbody');
+            tbody.querySelectorAll('tr').forEach(function(row) {
+                const csvRow = [];
+                
+                if (columns.includes('student')) {
+                    csvRow.push('"' + row.querySelector('td:nth-child(1)').textContent.trim() + '"');
+                }
+                
+                if (columns.includes('email')) {
+                    // Récupérer l'email depuis l'attribut data si disponible, sinon utiliser le texte
+                    const emailCell = row.querySelector('td:nth-child(1) a');
+                    csvRow.push('"' + (emailCell.getAttribute('data-email') || emailCell.textContent.trim()) + '"');
+                }
+                
+                if (columns.includes('date')) {
+                    csvRow.push('"' + row.querySelector('td:nth-child(2)').textContent.trim().split('\n')[0] + '"');
+                }
+                
+                if (columns.includes('attempt')) {
+                    csvRow.push('"' + row.querySelector('td:nth-child(3)').textContent.trim() + '"');
+                }
+                
+                if (columns.includes('status')) {
+                    csvRow.push('"' + row.querySelector('td:nth-child(4) .badge').textContent.trim() + '"');
+                }
+                
+                if (columns.includes('score')) {
+                    const scoreCell = row.querySelector('td:nth-child(5) .badge');
+                    csvRow.push('"' + (scoreCell.textContent.trim() === 'N/A' ? '' : scoreCell.textContent.trim()) + '"');
+                }
+                
+                if (columns.includes('feedback')) {
+                    // Cette donnée n'est pas directement dans le tableau, nous utilisons un attribut data si disponible
+                    const feedbackData = row.getAttribute('data-feedback') || '';
+                    csvRow.push('"' + feedbackData.replace(/"/g, '""') + '"');
+                }
+                
+                if (columns.includes('late')) {
+                    const isLate = row.querySelector('td:nth-child(2) .badge.bg-danger') !== null;
+                    csvRow.push(isLate ? '"Oui"' : '"Non"');
+                }
+                
+                rows.push(csvRow.join(','));
+            });
+            
+            // Télécharger le CSV
+            const csvContent = rows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'soumissions_{{ exercise.title|slugify }}.csv');
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Fermer le modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
+            modal.hide();
+        });
+    });
+</script>
+{% endblock %}

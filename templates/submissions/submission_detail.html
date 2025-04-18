@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Soumission - {{ submission.exercise.title }} - Plateforme d'Évaluation Automatisée{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <!-- En-tête avec titre et statut -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <h2 class="mb-2">
+                <a href="{% url 'exercises:exercise_detail' pk=submission.exercise.id %}" class="text-decoration-none text-reset">
+                    {{ submission.exercise.title }}
+                </a>
+            </h2>
+            <div class="d-flex align-items-center mb-2">
+                <span class="badge {% if submission.exercise.difficulty.value == 1 %}bg-success{% elif submission.exercise.difficulty.value == 2 %}bg-info{% elif submission.exercise.difficulty.value == 3 %}bg-warning{% elif submission.exercise.difficulty.value == 4 %}bg-danger{% else %}bg-secondary{% endif %} me-2">
+                    {{ submission.exercise.difficulty.name }}
+                </span>
+                <span class="badge bg-secondary me-3">{{ submission.exercise.topic.name }}</span>
+                
+                {% if submission.is_late %}
+                    <span class="badge bg-danger me-2">En retard</span>
+                {% endif %}
+                
+                <span class="text-muted">
+                    Tentative {{ submission.attempt_number }}/{{ submission.exercise.max_attempts }}
+                </span>
+            </div>
+            
+            <div class="d-flex align-items-center">
+                {% if submission.student == user %}
+                    <span class="text-muted me-3">Votre soumission du {{ submission.submitted_at|date:"d/m/Y à H:i" }}</span>
+                {% else %}
+                    <span class="text-muted me-3">
+                        Soumission de <strong>{{ submission.student.get_full_name|default:submission.student.email }}</strong>
+                        le {{ submission.submitted_at|date:"d/m/Y à H:i" }}
+                    </span>
+                {% endif %}
+                
+                <span class="status-indicator status-{{ submission.status }}"></span>
+                <span class="text-muted">
+                    {% if submission.status == 'pending' %}
+                        En attente d'évaluation
+                    {% elif submission.status == 'processing' %}
+                        Évaluation en cours
+                    {% elif submission.status == 'completed' %}
+                        Évaluation terminée
+                    {% else %}
+                        Erreur lors de l'évaluation
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+        
+        <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+            <!-- Note et actions -->
+            {% if submission.evaluation %}
+                <div class="mb-2">
+                    <span class="badge {% if submission.evaluation.score_out_of_20 >= 10 %}bg-success{% else %}bg-danger{% endif %} p-2" style="font-size: 1.2rem;">
+                        {{ submission.evaluation.score_out_of_20|floatformat:1 }}/20
+                    </span>
+                </div>
+            {% endif %}
+            
+            <div class="btn-group">
+                {% if submission.file %}
+                    <a href="{{ submission.file.url }}" class="btn btn-outline-primary" target="_blank">
+                        <i class="bi bi-file-earmark-pdf me-2"></i>Voir le PDF
+                    </a>
+                {% endif %}
+                
+                {% if user.is_teacher and submission.status == 'completed' %}
+                    <a href="{% url 'submissions:evaluation_review' submission_id=submission.id %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-pencil-square me-2"></i>Réviser l'évaluation
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Colonne principale: Évaluation -->
+        <div class="col-lg-8">
+            <!-- Affichage du statut pour les évaluations en cours -->
+            {% if submission.status == 'processing' %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body text-center py-5">
+                        <div class="loading-spinner mb-3"></div>
+                        <h4>Évaluation en cours...</h4>
+                        <p class="text-muted">Notre intelligence artificielle est en train d'analyser votre soumission.</p>
+                        <small class="text-muted">Cette opération peut prendre quelques minutes. La page se mettra à jour automatiquement.</small>
+                    </div>
+                </div>
+            {% elif submission.status == 'pending' %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-hourglass text-primary" style="font-size: 3rem;"></i>
+                        <h4 class="mt-3">En attente d'évaluation</h4>
+                        <p class="text-muted">Votre soumission est en attente de traitement.</p>
+                    </div>
+                </div>
+            {% elif submission.status == 'error' %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 3rem;"></i>
+                        <h4 class="mt-3">Erreur lors de l'évaluation</h4>
+                        <p class="text-muted">Une erreur s'est produite lors de l'évaluation de votre soumission.</p>
+                        {% if user.is_teacher %}
+                            <a href="#" class="btn btn-outline-primary">
+                                <i class="bi bi-arrow-clockwise me-2"></i>Relancer l'évaluation
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% elif evaluation %}
+                <!-- Résumé de l'évaluation -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Résumé de l'évaluation</h5>
+                            {% if evaluation.reviewed_by_teacher %}
+                                <span class="badge bg-info">
+                                    <i class="bi bi-check-circle me-1"></i>Révisé par un professeur
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-robot me-1"></i>Généré par IA
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row align-items-center mb-4">
+                            <div class="col-md-4 text-center">
+                                <div class="display-4 fw-bold {% if evaluation.score_out_of_20 >= 10 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ evaluation.score_out_of_20|floatformat:1 }}
+                                </div>
+                                <div class="text-muted">Note sur 20</div>
+                            </div>
+                            <div class="col-md-8">
+                                <div class="progress mb-2" style="height: 25px;">
+                                    <div class="progress-bar {% if evaluation.percentage >= 50 %}bg-success{% else %}bg-danger{% endif %}" role="progressbar" style="width: {{ evaluation.percentage }}%;" aria-valuenow="{{ evaluation.percentage }}" aria-valuemin="0" aria-valuemax="100">
+                                        {{ evaluation.percentage|floatformat:0 }}%
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between text-muted">
+                                    <small>0%</small>
+                                    <small>Taux de réussite</small>
+                                    <small>100%</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% if evaluation.general_feedback %}
+                            <div class="mb-0">
+                                <h6>Feedback général :</h6>
+                                <div class="p-3 border rounded bg-light">
+                                    {{ evaluation.general_feedback|linebreaks }}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Éléments de feedback détaillé -->
+                {% if feedback_items %}
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0">Feedback détaillé</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="list-group list-group-flush">
+                                {% for item in feedback_items %}
+                                    <div class="list-group-item list-group-item-action">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h6 class="mb-0">
+                                                {% if item.feedback_type == 'positive' %}
+                                                    <i class="bi bi-check-circle-fill text-success me-2"></i>
+                                                {% elif item.feedback_type == 'improvement' %}
+                                                    <i class="bi bi-exclamation-circle-fill text-warning me-2"></i>
+                                                {% elif item.feedback_type == 'error' %}
+                                                    <i class="bi bi-x-circle-fill text-danger me-2"></i>
+                                                {% else %}
+                                                    <i class="bi bi-lightbulb-fill text-info me-2"></i>
+                                                {% endif %}
+                                                {{ item.title }}
+                                            </h6>
+                                            {% if item.point_impact != 0 %}
+                                                <span class="badge {% if item.point_impact > 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                                    {% if item.point_impact > 0 %}+{% endif %}{{ item.point_impact }}
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="text-muted small">
+                                            {{ item.content|linebreaks }}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+                
+                <!-- Actions pour les professeurs -->
+                {% if user.is_teacher %}
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0">Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <a href="{% url 'submissions:evaluation_review' submission_id=submission.id %}" class="btn btn-outline-primary w-100 mb-2">
+                                        <i class="bi bi-pencil-square me-2"></i>Réviser l'évaluation
+                                    </a>
+                                </div>
+                                <div class="col-md-6">
+                                    <a href="{% url 'submissions:add_feedback' submission_id=submission.id %}" class="btn btn-outline-secondary w-100 mb-2">
+                                        <i class="bi bi-plus-circle me-2"></i>Ajouter un feedback
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endif %}
+        </div>
+        
+        <!-- Colonne latérale: Informations -->
+        <div class="col-lg-4">
+            <!-- Détails de la soumission -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Détails de la soumission</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted">Étudiant</span>
+                            <span>{{ submission.student.get_full_name|default:submission.student.email }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted">Date de soumission</span>
+                            <span>{{ submission.submitted_at|date:"d/m/Y H:i" }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted">Tentative</span>
+                            <span>{{ submission.attempt_number }}/{{ submission.exercise.max_attempts }}</span>
+                        </li>
+                        {% if submission.processed_at %}
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Date de traitement</span>
+                                <span>{{ submission.processed_at|date:"d/m/Y H:i" }}</span>
+                            </li>
+                        {% endif %}
+                        <li class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted">Statut</span>
+                            <span>
+                                {% if submission.status == 'pending' %}
+                                    <span class="badge bg-warning">En attente</span>
+                                {% elif submission.status == 'processing' %}
+                                    <span class="badge bg-info">En traitement</span>
+                                {% elif submission.status == 'completed' %}
+                                    <span class="badge bg-success">Complété</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Erreur</span>
+                                {% endif %}
+                            </span>
+                        </li>
+                        {% if submission.evaluation %}
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Note</span>
+                                <span class="fw-bold {% if submission.evaluation.score_out_of_20 >= 10 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ submission.evaluation.score }}/{{ submission.exercise.total_points }}
+                                    ({{ submission.evaluation.score_out_of_20|floatformat:1 }}/20)
+                                </span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Type d'évaluation</span>
+                                <span>
+                                    {% if submission.evaluation.reviewed_by_teacher %}
+                                        <span class="badge bg-info">Révisée par professeur</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Automatique (IA)</span>
+                                    {% endif %}
+                                </span>
+                            </li>
+                        {% endif %}
+                    </ul>
+                    
+                    {% if submission.file %}
+                        <div class="mt-3">
+                            <a href="{{ submission.file.url }}" class="btn btn-outline-primary w-100" target="_blank">
+                                <i class="bi bi-file-earmark-pdf me-2"></i>Voir le fichier soumis
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Autres tentatives -->
+            {% with other_submissions=submission.exercise.submissions.filter(student=submission.student).exclude(id=submission.id) %}
+                {% if other_submissions %}
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0">Autres tentatives</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="list-group list-group-flush">
+                                {% for other in other_submissions %}
+                                    <a href="{% url 'submissions:submission_detail' pk=other.id %}" class="list-group-item list-group-item-action">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="mb-1">Tentative #{{ other.attempt_number }}</h6>
+                                                <small class="text-muted">{{ other.submitted_at|date:"d/m/Y H:i" }}</small>
+                                            </div>
+                                            {% if other.evaluation %}
+                                                <span class="badge {% if other.evaluation.score_out_of_20 >= 10 %}bg-success{% else %}bg-danger{% endif %}">
+                                                    {{ other.evaluation.score_out_of_20|floatformat:1 }}/20
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">N/A</span>
+                                            {% endif %}
+                                        </div>
+                                    </a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if submission.status == 'processing' %}
+<script>
+    // Vérifier périodiquement le statut de l'évaluation
+    let checkStatusInterval;
+    
+    function checkEvaluationStatus() {
+        fetch('{% url "submissions:check_evaluation_status" submission_id=submission.id %}')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status !== 'processing') {
+                    // L'évaluation est terminée, recharger la page
+                    clearInterval(checkStatusInterval);
+                    
+                    if (data.redirect_url) {
+                        window.location.href = data.redirect_url;
+                    } else {
+                        window.location.reload();
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Erreur lors de la vérification du statut:', error);
+            });
+    }
+    
+    // Vérifier toutes les 5 secondes
+    document.addEventListener('DOMContentLoaded', function() {
+        checkStatusInterval = setInterval(checkEvaluationStatus, 5000);
+    });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Ajouter un feedback - {{ submission.exercise.title }} - Plateforme d'Évaluation Automatisée{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Ajouter un élément de feedback</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Informations sur la soumission -->
+                    <div class="alert alert-info mb-4">
+                        <h5 class="alert-heading">
+                            <i class="bi bi-info-circle me-2"></i>Soumission : {{ submission.exercise.title }}
+                        </h5>
+                        <p class="mb-1">Étudiant : {{ submission.student.get_full_name|default:submission.student.email }}</p>
+                        <p class="mb-1">Date : {{ submission.submitted_at|date:"d/m/Y H:i" }}</p>
+                        <p class="mb-0">
+                            <a href="{% url 'submissions:submission_detail' pk=submission.id %}" class="alert-link small">
+                                Voir la soumission complète
+                            </a>
+                            {% if submission.file %}
+                                <span class="mx-2">|</span>
+                                <a href="{{ submission.file.url }}" class="alert-link small" target="_blank">
+                                    Voir le PDF soumis
+                                </a>
+                            {% endif %}
+                        </p>
+                    </div>
+                    
+                    <!-- Formulaire de feedback -->
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <h5 class="mb-3">Informations de base</h5>
+                        <div class="mb-3">
+                            {{ form.title|as_crispy_field }}
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                {{ form.feedback_type|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.category|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <h5 class="mb-3 mt-4">Contenu du feedback</h5>
+                        <div class="mb-4">
+                            {{ form.content|as_crispy_field }}
+                        </div>
+                        
+                        <h5 class="mb-3">Impact sur la note</h5>
+                        <div class="mb-4">
+                            {{ form.point_impact|as_crispy_field }}
+                            <small class="form-text text-muted">
+                                Indiquez l'impact positif ou négatif sur la note. Exemple : +2 pour un bonus, -1 pour une pénalité.
+                                Laisser à 0 si ce feedback n'a pas d'impact direct sur la notation.
+                            </small>
+                        </div>
+                        
+                        <!-- Boutons de soumission -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'submissions:submission_detail' pk=submission.id %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Retour à la soumission
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plus-circle me-2"></i>Ajouter le feedback
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Aide pour rédiger un bon feedback -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Conseils pour un feedback efficace</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-check-circle text-success me-2"></i>Soyez spécifique</h6>
+                            <p class="small text-muted">Mentionnez précisément les points à améliorer ou les erreurs plutôt que des commentaires généraux.</p>
+                            
+                            <h6><i class="bi bi-check-circle text-success me-2"></i>Équilibrez positif et négatif</h6>
+                            <p class="small text-muted">Un bon feedback contient à la fois des points forts et des points à améliorer.</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-check-circle text-success me-2"></i>Formulez de manière constructive</h6>
+                            <p class="small text-muted">Proposez des solutions ou alternatives plutôt que simplement pointer les problèmes.</p>
+                            
+                            <h6><i class="bi bi-check-circle text-success me-2"></i>Utilisez des exemples</h6>
+                            <p class="small text-muted">Illustrez vos remarques avec des exemples concrets tirés de la soumission de l'étudiant.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Mise à jour des styles en fonction du type de feedback
+        const feedbackTypeSelect = document.getElementById('{{ form.feedback_type.id_for_label }}');
+        const titleInput = document.getElementById('{{ form.title.id_for_label }}');
+        const pointImpactInput = document.getElementById('{{ form.point_impact.id_for_label }}');
+        
+        function updateStyles() {
+            const type = feedbackTypeSelect.value;
+            
+            // Réinitialiser les classes
+            titleInput.classList.remove('border-success', 'border-warning', 'border-danger', 'border-info');
+            
+            // Appliquer la classe correspondante
+            if (type === 'positive') {
+                titleInput.classList.add('border-success');
+                if (pointImpactInput.value == 0) {
+                    pointImpactInput.value = 1;
+                }
+            } else if (type === 'improvement') {
+                titleInput.classList.add('border-warning');
+                if (pointImpactInput.value == 0) {
+                    pointImpactInput.value = -0.5;
+                }
+            } else if (type === 'error') {
+                titleInput.classList.add('border-danger');
+                if (pointImpactInput.value == 0) {
+                    pointImpactInput.value = -1;
+                }
+            } else if (type === 'suggestion') {
+                titleInput.classList.add('border-info');
+                pointImpactInput.value = 0;
+            }
+        }
+        
+        // Appliquer les styles initiaux
+        updateStyles();
+        
+        // Mettre à jour les styles lors du changement de type
+        feedbackTypeSelect.addEventListener('change', updateStyles);
+        
+        // Validation du formulaire
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function(e) {
+            // Vérifier que le titre est rempli
+            if (!titleInput.value.trim()) {
+                e.preventDefault();
+                alert('Le titre du feedback est requis.');
+                titleInput.focus();
+            }
+            
+            // Vérifier que le contenu est rempli
+            const contentTextarea = document.getElementById('{{ form.content.id_for_label }}');
+            if (!contentTextarea.value.trim()) {
+                e.preventDefault();
+                alert('Le contenu du feedback est requis.');
+                contentTextarea.focus();
+            }
+        });
+    });
+</script>
+{% endblock %}
