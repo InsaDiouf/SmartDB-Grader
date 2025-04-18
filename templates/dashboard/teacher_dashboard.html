@@ -1,158 +1,438 @@
-document.addEventListener('DOMContentLoaded', function() {
-    // Distribution des notes
-    const scoreDistributionCtx = document.getElementById('scoreDistributionChart').getContext('2d');
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Tableau de bord professeur - Plateforme d'Évaluation Automatisée{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <!-- En-tête -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <h2 class="mb-2">Tableau de bord professeur</h2>
+            <p class="text-muted">
+                Bienvenue, Prof. {{ user.get_full_name|default:user.email }}. Gérez vos exercices et suivez les performances de vos étudiants.
+            </p>
+        </div>
+        <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+            <a href="{% url 'exercises:exercise_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-2"></i>Créer un exercice
+            </a>
+        </div>
+    </div>
     
-    const scoreDistributionData = {
-        labels: ['0-20%', '20-40%', '40-60%', '60-80%', '80-100%'],
-        datasets: [{
-            label: 'Nombre d\'étudiants',
-            data: [
-                {% for item in score_distribution %}
-                    {{ item.count }},
-                {% empty %}
-                    0, 0, 0, 0, 0
-                {% endfor %}
-            ],
-            backgroundColor: [
-                'rgba(220, 53, 69, 0.6)',
-                'rgba(255, 193, 7, 0.6)',
-                'rgba(13, 202, 240, 0.6)',
-                'rgba(25, 135, 84, 0.6)',
-                'rgba(25, 135, 84, 0.8)'
-            ],
-            borderColor: [
-                'rgb(220, 53, 69)',
-                'rgb(255, 193, 7)',
-                'rgb(13, 202, 240)',
-                'rgb(25, 135, 84)',
-                'rgb(25, 135, 84)'
-            ],
-            borderWidth: 1
-        }]
-    };
+    <!-- Statistiques rapides -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h3 class="text-primary">{{ total_exercises }}</h3>
+                    <p class="text-muted mb-0">Exercices créés</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h3 class="text-primary">{{ total_submissions }}</h3>
+                    <p class="text-muted mb-0">Soumissions reçues</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h3 class="text-primary">{{ unique_students }}</h3>
+                    <p class="text-muted mb-0">Étudiants actifs</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h3 class="text-{% if avg_score_pct >= 50 %}success{% else %}danger{% endif %}">
+                        {{ avg_score_pct }}%
+                    </h3>
+                    <p class="text-muted mb-0">Taux de réussite</p>
+                </div>
+            </div>
+        </div>
+    </div>
     
-    new Chart(scoreDistributionCtx, {
-        type: 'bar',
-        data: scoreDistributionData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1
+    <!-- Contenu principal -->
+    <div class="row">
+        <div class="col-lg-7">
+            <!-- Exercices récents -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Mes exercices</h5>
+                    <a href="{% url 'exercises:exercise_list' %}" class="btn btn-sm btn-outline-primary">
+                        Voir tous
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% if exercises %}
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Titre</th>
+                                        <th>Catégorie</th>
+                                        <th>Statut</th>
+                                        <th>Soumissions</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for exercise in exercises|slice:":5" %}
+                                        <tr>
+                                            <td>
+                                                <a href="{% url 'exercises:exercise_detail' pk=exercise.id %}">
+                                                    {{ exercise.title }}
+                                                </a>
+                                            </td>
+                                            <td>{{ exercise.topic.name }}</td>
+                                            <td>
+                                                {% if exercise.is_published %}
+                                                    <span class="badge bg-success">Publié</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">Brouillon</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-info">{{ exercise.submissions.count }}</span>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group">
+                                                    <a href="{% url 'submissions:exercise_submissions' exercise_id=exercise.id %}" class="btn btn-sm btn-outline-primary">
+                                                        <i class="bi bi-list-check"></i>
+                                                    </a>
+                                                    <a href="{% url 'exercises:exercise_update' pk=exercise.id %}" class="btn btn-sm btn-outline-secondary">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <div class="text-muted">
+                                <i class="bi bi-journal-x" style="font-size: 2rem;"></i>
+                                <p class="mt-2">Vous n'avez pas encore créé d'exercices</p>
+                                <a href="{% url 'exercises:exercise_create' %}" class="btn btn-primary">
+                                    <i class="bi bi-plus-circle me-2"></i>Créer mon premier exercice
+                                </a>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Graphique de distribution des notes -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Distribution des notes</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="scoreDistributionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Activité quotidienne -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Activité quotidienne</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="dailyActivityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-5">
+            <!-- Soumissions récentes -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Soumissions récentes</h5>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            Actions
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'accounts:student_list' %}">Voir tous les étudiants</a></li>
+                            <li><a class="dropdown-item" href="#">Exporter les statistiques</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_submissions %}
+                        <div class="list-group list-group-flush">
+                            {% for submission in recent_submissions %}
+                                <a href="{% url 'submissions:submission_detail' pk=submission.id %}" class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">
+                                            {{ submission.student.get_full_name|default:submission.student.email }}
+                                        </h6>
+                                        <small class="text-muted">{{ submission.submitted_at|date:"d/m H:i" }}</small>
+                                    </div>
+                                    <p class="mb-1 small">{{ submission.exercise.title }}</p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-muted">
+                                            {% if submission.status == 'pending' %}
+                                                <span class="status-indicator status-pending"></span>En attente
+                                            {% elif submission.status == 'processing' %}
+                                                <span class="status-indicator status-processing"></span>En traitement
+                                            {% elif submission.status == 'completed' %}
+                                                <span class="status-indicator status-completed"></span>Complété
+                                            {% else %}
+                                                <span class="status-indicator status-error"></span>Erreur
+                                            {% endif %}
+                                        </small>
+                                        {% if submission.evaluation %}
+                                            <span class="badge {% if submission.evaluation.score_out_of_20 >= 10 %}bg-success{% else %}bg-danger{% endif %}">
+                                                {{ submission.evaluation.score_out_of_20|floatformat:1 }}/20
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <div class="text-muted">
+                                <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                                <p class="mt-2">Aucune soumission récente</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Performance par catégorie -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Performance par catégorie</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="categoryPerformanceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Rappels et tâches -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">À faire</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        {% with pending_evaluations=recent_submissions|filter:is_pending|length %}
+                            {% if pending_evaluations > 0 %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <span>Évaluations en attente</span>
+                                    <span class="badge bg-warning rounded-pill">{{ pending_evaluations }}</span>
+                                </li>
+                            {% endif %}
+                        {% endwith %}
+                        
+                        {% with exercises_without_correction=exercises|filter:has_no_correction|length %}
+                            {% if exercises_without_correction > 0 %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <span>Exercices sans correction</span>
+                                    <span class="badge bg-danger rounded-pill">{{ exercises_without_correction }}</span>
+                                </li>
+                            {% endif %}
+                        {% endwith %}
+                        
+                        {% with expiring_exercises=exercises|filter:expires_soon|length %}
+                            {% if expiring_exercises > 0 %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <span>Exercices qui expirent bientôt</span>
+                                    <span class="badge bg-info rounded-pill">{{ expiring_exercises }}</span>
+                                </li>
+                            {% endif %}
+                        {% endwith %}
+                        
+                        {% if recent_submissions %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span>Soumissions récentes à évaluer</span>
+                                <span class="badge bg-primary rounded-pill">{{ recent_submissions|length }}</span>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Distribution des notes
+        const scoreDistributionCtx = document.getElementById('scoreDistributionChart').getContext('2d');
+        
+        const scoreDistributionData = {
+            labels: ['0-20%', '20-40%', '40-60%', '60-80%', '80-100%'],
+            datasets: [{
+                label: 'Nombre d\'étudiants',
+                data: [
+                    {% for item in score_distribution %}
+                        {{ item.count }},
+                    {% empty %}
+                        0, 0, 0, 0, 0
+                    {% endfor %}
+                ],
+                backgroundColor: [
+                    'rgba(220, 53, 69, 0.6)',
+                    'rgba(255, 193, 7, 0.6)',
+                    'rgba(13, 202, 240, 0.6)',
+                    'rgba(25, 135, 84, 0.6)',
+                    'rgba(25, 135, 84, 0.8)'
+                ],
+                borderColor: [
+                    'rgb(220, 53, 69)',
+                    'rgb(255, 193, 7)',
+                    'rgb(13, 202, 240)',
+                    'rgb(25, 135, 84)',
+                    'rgb(25, 135, 84)'
+                ],
+                borderWidth: 1
+            }]
+        };
+        
+        new Chart(scoreDistributionCtx, {
+            type: 'bar',
+            data: scoreDistributionData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
                     }
-                }
-            },
-            plugins: {
-                legend: {
-                    display: false
                 },
-                tooltip: {
-                    callbacks: {
-                        title: function(tooltipItems) {
-                            return 'Plage de notes: ' + tooltipItems[0].label;
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(tooltipItems) {
+                                return 'Plage de notes: ' + tooltipItems[0].label;
+                            }
                         }
                     }
                 }
             }
-        }
-    });
-    
-    // Activité quotidienne
-    const dailyActivityCtx = document.getElementById('dailyActivityChart').getContext('2d');
-    
-    const dailyActivityData = {
-        labels: [
-            {% for item in daily_activity %}
-                "{{ item.day|date:'d/m' }}",
-            {% endfor %}
-        ],
-        datasets: [{
-            label: 'Soumissions',
-            data: [
+        });
+        
+        // Activité quotidienne
+        const dailyActivityCtx = document.getElementById('dailyActivityChart').getContext('2d');
+        
+        const dailyActivityData = {
+            labels: [
                 {% for item in daily_activity %}
-                    {{ item.count }},
+                    "{{ item.day|date:'d/m' }}",
                 {% endfor %}
             ],
-            borderColor: '#4361ee',
-            backgroundColor: 'rgba(67, 97, 238, 0.1)',
-            tension: 0.3,
-            fill: true
-        }]
-    };
-    
-    new Chart(dailyActivityCtx, {
-        type: 'line',
-        data: dailyActivityData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1
+            datasets: [{
+                label: 'Soumissions',
+                data: [
+                    {% for item in daily_activity %}
+                        {{ item.count }},
+                    {% endfor %}
+                ],
+                borderColor: '#4361ee',
+                backgroundColor: 'rgba(67, 97, 238, 0.1)',
+                tension: 0.3,
+                fill: true
+            }]
+        };
+        
+        new Chart(dailyActivityCtx, {
+            type: 'line',
+            data: dailyActivityData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
                     }
                 }
-            },
-            plugins: {
-                legend: {
-                    display: false
-                }
             }
-        }
-    });
-    
-    // Performance par catégorie
-    const categoryPerformanceCtx = document.getElementById('categoryPerformanceChart').getContext('2d');
-    
-    // Ces données devraient être générées par le backend
-    const categoryData = {
-        labels: [
-            {% for topic in topics %}
-                "{{ topic.name }}",
-            {% empty %}
-                "Bases de données", "SQL", "Modélisation", "NoSQL", "Optimisation"
-            {% endfor %}
-        ],
-        datasets: [{
-            label: 'Note moyenne',
-            data: [
-                {% for topic in topic_performance %}
-                    {{ topic.avg_score|floatformat:1 }},
+        });
+        
+        // Performance par catégorie
+        const categoryPerformanceCtx = document.getElementById('categoryPerformanceChart').getContext('2d');
+        
+        // Ces données devraient être générées par le backend
+        const categoryData = {
+            labels: [
+                {% for topic in topics %}
+                    "{{ topic.name }}",
                 {% empty %}
-                    16.5, 14.2, 12.8, 15.0, 13.5
+                    "Bases de données", "SQL", "Modélisation", "NoSQL", "Optimisation"
                 {% endfor %}
             ],
-            backgroundColor: 'rgba(67, 97, 238, 0.6)',
-            borderColor: 'rgb(67, 97, 238)',
-            borderWidth: 1
-        }]
-    };
-    
-    new Chart(categoryPerformanceCtx, {
-        type: 'bar',
-        data: categoryData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 20,
-                    title: {
-                        display: true,
-                        text: 'Note moyenne'
+            datasets: [{
+                label: 'Note moyenne',
+                data: [
+                    {% for topic in topic_performance %}
+                        {{ topic.avg_score|floatformat:1 }},
+                    {% empty %}
+                        16.5, 14.2, 12.8, 15.0, 13.5
+                    {% endfor %}
+                ],
+                backgroundColor: 'rgba(67, 97, 238, 0.6)',
+                borderColor: 'rgb(67, 97, 238)',
+                borderWidth: 1
+            }]
+        };
+        
+        new Chart(categoryPerformanceCtx, {
+            type: 'bar',
+            data: categoryData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 20,
+                        title: {
+                            display: true,
+                            text: 'Note moyenne'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                       display: false
                     }
                 }
-            },
-            plugins: {
-                legend: {
-                    display: false
-                }
             }
-        }
+        });
     });
-});
+</script>
+{% endblock %}
