@@ -22,10 +22,10 @@ class SubmissionForm(forms.ModelForm):
         model = Submission
         fields = ['file']
     
-    def _init_(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         self.exercise = kwargs.pop('exercise', None)
         self.student = kwargs.pop('student', None)
-        super()._init_(*args, **kwargs)
+        super().__init__(*args, **kwargs)
     
     def clean_file(self):
         file = self.cleaned_data.get('file')
