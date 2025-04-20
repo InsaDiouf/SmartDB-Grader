@@ -128,6 +128,14 @@ class ExerciseDetailView(LoginRequiredMixin, DetailView):
             context['corrections'] = exercise.corrections.all()
             context['assignments'] = exercise.assignments.all()
             context['submissions_count'] = exercise.submissions.count()
+            
+            # Préparer les données de soumission pour chaque assignation
+            for assignment in context['assignments']:
+                # Trouver la première soumission pour cet étudiant et cet exercice
+                submission = exercise.submissions.filter(
+                    student=assignment.assigned_to
+                ).first()
+                assignment.student_submission = submission
         
         # Informations pour les étudiants
         if user.is_student:
@@ -149,6 +157,9 @@ class ExerciseDetailView(LoginRequiredMixin, DetailView):
             context['assignment'] = ExerciseAssignment.objects.filter(
                 exercise=exercise, assigned_to=user
             ).first()
+            
+        # Ajouter la date et l'heure actuelles pour les comparaisons dans le template
+        context['now'] = timezone.now()
         
         return context
 

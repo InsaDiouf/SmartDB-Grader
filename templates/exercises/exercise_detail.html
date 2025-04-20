@@ -253,8 +253,8 @@
                                                     {% endif %}
                                                 </td>
                                                 <td>
-                                                    {% with submission=exercise.submissions.filter(student=assignment.assigned_to).first %}
-                                                        {% if submission %}
+                                                    {% if assignment.student_submission %}
+                                                        {% with submission=assignment.student_submission %}
                                                             {% if submission.status == 'completed' and submission.evaluation %}
                                                                 <span class="badge bg-success">Complété</span>
                                                             {% elif submission.status == 'processing' %}
@@ -262,14 +262,14 @@
                                                             {% else %}
                                                                 <span class="badge bg-warning">Soumis</span>
                                                             {% endif %}
+                                                        {% endwith %}
+                                                    {% else %}
+                                                        {% if assignment.effective_deadline and assignment.effective_deadline < now %}
+                                                            <span class="badge bg-danger">En retard</span>
                                                         {% else %}
-                                                            {% if assignment.effective_deadline and assignment.effective_deadline < now %}
-                                                                <span class="badge bg-danger">En retard</span>
-                                                            {% else %}
-                                                                <span class="badge bg-secondary">Non soumis</span>
-                                                            {% endif %}
+                                                            <span class="badge bg-secondary">Non soumis</span>
                                                         {% endif %}
-                                                    {% endwith %}
+                                                    {% endif %}
                                                 </td>
                                                 <td>
                                                     <div class="btn-group">
@@ -535,7 +535,7 @@
     {% endfor %}
 {% endif %}
 
-<!-- Modal pour publier/dépublier -->
+<!-- Suite du Modal pour publier/dépublier -->
 {% if is_teacher %}
     <div class="modal fade" id="publishModal" tabindex="-1" aria-labelledby="publishModalLabel" aria-hidden="true">
         <div class="modal-dialog">
