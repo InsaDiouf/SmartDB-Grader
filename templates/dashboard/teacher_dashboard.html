@@ -233,32 +233,26 @@
                 </div>
                 <div class="card-body">
                     <ul class="list-group list-group-flush">
-                        {% with pending_evaluations=recent_submissions|filter:is_pending|length %}
-                            {% if pending_evaluations > 0 %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                                    <span>Évaluations en attente</span>
-                                    <span class="badge bg-warning rounded-pill">{{ pending_evaluations }}</span>
-                                </li>
-                            {% endif %}
-                        {% endwith %}
+                        {% if pending_evaluations > 0 %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span>Évaluations en attente</span>
+                                <span class="badge bg-warning rounded-pill">{{ pending_evaluations }}</span>
+                            </li>
+                        {% endif %}
                         
-                        {% with exercises_without_correction=exercises|filter:has_no_correction|length %}
-                            {% if exercises_without_correction > 0 %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                                    <span>Exercices sans correction</span>
-                                    <span class="badge bg-danger rounded-pill">{{ exercises_without_correction }}</span>
-                                </li>
-                            {% endif %}
-                        {% endwith %}
+                        {% if exercises_without_correction > 0 %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span>Exercices sans correction</span>
+                                <span class="badge bg-danger rounded-pill">{{ exercises_without_correction }}</span>
+                            </li>
+                        {% endif %}
                         
-                        {% with expiring_exercises=exercises|filter:expires_soon|length %}
-                            {% if expiring_exercises > 0 %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                                    <span>Exercices qui expirent bientôt</span>
-                                    <span class="badge bg-info rounded-pill">{{ expiring_exercises }}</span>
-                                </li>
-                            {% endif %}
-                        {% endwith %}
+                        {% if expiring_exercises > 0 %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span>Exercices qui expirent bientôt</span>
+                                <span class="badge bg-info rounded-pill">{{ expiring_exercises }}</span>
+                            </li>
+                        {% endif %}
                         
                         {% if recent_submissions %}
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0">

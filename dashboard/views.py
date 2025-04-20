@@ -117,12 +117,12 @@ def teacher_dashboard(request):
     
     # Taux moyen de réussite
     avg_score_pct = Evaluation.objects.filter(
-        submission__exercise__author=teacher
+        submission_exercise_author=teacher
     ).aggregate(avg=Avg('percentage'))['avg'] or 0
     
     # Distribution des notes (pour graphiques)
     score_distribution = Evaluation.objects.filter(
-        submission__exercise__author=teacher
+        submission_exercise_author=teacher
     ).annotate(
         range=Case(
             When(percentage__lt=20, then=Value('0-20%')),
@@ -143,6 +143,44 @@ def teacher_dashboard(request):
         day=TruncDate('submitted_at')
     ).values('day').annotate(count=Count('id')).order_by('day')
     
+    # Calcul des tâches à faire
+    pending_evaluations = recent_submissions.filter(status='pending').count()
+    
+    # Exercices sans correction
+    exercises_without_correction = 0
+    for exercise in exercises:
+        if not exercise.corrections.exists():
+            exercises_without_correction += 1
+    
+    # Exercices qui expirent bientôt (dans la semaine)
+    now = timezone.now()
+    expiring_soon = timezone.now() + timezone.timedelta(days=7)
+    expiring_exercises = exercises.filter(
+        deadline__gt=now,
+        deadline__lt=expiring_soon
+    ).count()
+    
+    # Obtenir les données de performance par sujet/catégorie
+    from django.db.models import Subquery, OuterRef
+    
+    # Supposons que vous ayez un modèle Topic pour les catégories d'exercices
+    from exercises.models import Topic  # Ajustez selon votre projet
+    
+    topics = Topic.objects.all()
+    topic_performance = []
+    
+    for topic in topics:
+        avg = Evaluation.objects.filter(
+            submission_exercise_topic=topic,
+            submission_exercise_author=teacher
+        ).aggregate(avg=Avg('score'))['avg']
+        
+        if avg is not None:
+            topic_performance.append({
+                'name': topic.name,
+                'avg_score': avg * 20 if avg <= 1.0 else avg  # Convertir en score sur 20 si nécessaire
+            })
+    
     context = {
         'exercises': exercises,
         'recent_submissions': recent_submissions,
@@ -152,6 +190,11 @@ def teacher_dashboard(request):
         'avg_score_pct': round(avg_score_pct, 2),
         'score_distribution': list(score_distribution),
         'daily_activity': list(daily_activity),
+        'pending_evaluations': pending_evaluations,
+        'exercises_without_correction': exercises_without_correction,
+        'expiring_exercises': expiring_exercises,
+        'topics': topics,
+        'topic_performance': topic_performance,
     }
     
     return render(request, 'dashboard/teacher_dashboard.html', context)
