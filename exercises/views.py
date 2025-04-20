@@ -1,5 +1,8 @@
 from django.shortcuts import render
 
+import uuid
+from django.utils.text import slugify
+
 # Create your views here.
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -172,7 +175,15 @@ class ExerciseCreateView(LoginRequiredMixin, TeacherRequiredMixin, CreateView):
     template_name = 'exercises/exercise_form.html'
     
     def form_valid(self, form):
+        # Définir l'auteur comme l'utilisateur actuel
         form.instance.author = self.request.user
+        
+        # Générer un slug unique
+        base_slug = slugify(form.instance.title)
+        if Exercise.objects.filter(slug=base_slug).exists():
+            form.instance.slug = f"{base_slug}-{uuid.uuid4().hex[:6]}"
+        else:
+            form.instance.slug = base_slug
         
         # Générer le texte à partir du PDF pour la recherche
         if form.cleaned_data.get('file'):
@@ -184,7 +195,6 @@ class ExerciseCreateView(LoginRequiredMixin, TeacherRequiredMixin, CreateView):
     
     def get_success_url(self):
         return reverse('exercises:exercise_detail', kwargs={'pk': self.object.pk})
-
 
 class ExerciseUpdateView(LoginRequiredMixin, TeacherRequiredMixin, UpdateView):
     """Vue pour modifier un exercice existant."""
