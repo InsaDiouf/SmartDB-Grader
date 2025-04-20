@@ -130,6 +130,12 @@ class SubmissionDetailView(LoginRequiredMixin, DetailView):
         # Vérifier si la soumission est en cours de traitement
         context['is_processing'] = submission.status == 'processing'
         
+        # Récupérer les autres soumissions du même étudiant pour cet exercice
+        context['other_submissions'] = Submission.objects.filter(
+            exercise=submission.exercise,
+            student=submission.student
+        ).exclude(id=submission.id).order_by('-submitted_at')
+        
         return context
 
 

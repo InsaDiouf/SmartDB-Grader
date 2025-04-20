@@ -300,35 +300,25 @@
             </div>
             
             <!-- Autres tentatives -->
-            {% with other_submissions=submission.exercise.submissions.filter(student=submission.student).exclude(id=submission.id) %}
-                {% if other_submissions %}
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-white">
-                            <h5 class="mb-0">Autres tentatives</h5>
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="list-group list-group-flush">
-                                {% for other in other_submissions %}
-                                    <a href="{% url 'submissions:submission_detail' pk=other.id %}" class="list-group-item list-group-item-action">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <h6 class="mb-1">Tentative #{{ other.attempt_number }}</h6>
-                                                <small class="text-muted">{{ other.submitted_at|date:"d/m/Y H:i" }}</small>
-                                            </div>
-                                            {% if other.evaluation %}
-                                                <span class="badge {% if other.evaluation.score_out_of_20 >= 10 %}bg-success{% else %}bg-danger{% endif %}">
-                                                    {{ other.evaluation.score_out_of_20|floatformat:1 }}/20
-                                                </span>
-                                            {% else %}
-                                                <span class="badge bg-secondary">N/A</span>
-                                            {% endif %}
-                                        </div>
-                                    </a>
-                                {% endfor %}
-                            </div>
+            {% with other_submissions=other_submissions %}
+            {% if other_submissions %}
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Autres tentatives</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="list-group list-group-flush">
+                            {% for other in other_submissions %}
+                                <a href="{% url 'submissions:submission_detail' pk=other.id %}" class="list-group-item list-group-item-action">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <!-- Votre contenu ici -->
+                                    </div>
+                                </a>
+                            {% endfor %}
                         </div>
                     </div>
-                {% endif %}
+                </div>
+            {% endif %}
             {% endwith %}
         </div>
     </div>
