@@ -3,7 +3,7 @@ venv/
 __pycache__/
 *.py[cod]
 *.class
-
+wheel/
 # Fichiers locaux
 *.sqlite3
 *.pyc
