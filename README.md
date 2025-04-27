@@ -9,5 +9,3 @@
 ## DJIBRIL SANOU GUEYE
 
 ## BABA NDIAYE
-
-#vbmf fg
