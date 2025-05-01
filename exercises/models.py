@@ -29,7 +29,7 @@ class Topic(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
-    def _str_(self):
+    def __str__(self):
         return self.name
     
     def save(self, *args, **kwargs):
@@ -45,7 +45,7 @@ class DifficultyLevel(models.Model):
     value = models.IntegerField()  # 1, 2, 3, 4
     description = models.TextField(blank=True)
     
-    def _str_(self):
+    def __str__(self):
         return self.name
 
 
