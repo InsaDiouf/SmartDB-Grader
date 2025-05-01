@@ -101,10 +101,13 @@ def teacher_dashboard(request):
     # Exercices créés par le professeur
     exercises = Exercise.objects.filter(author=teacher)
     
-    # Soumissions récentes pour les exercices du professeur
-    recent_submissions = Submission.objects.filter(
+    # Soumissions pour les exercices du professeur (sans slice)
+    all_recent_submissions = Submission.objects.filter(
         exercise__author=teacher
-    ).order_by('-submitted_at')[:10]
+    ).order_by('-submitted_at')
+    
+    # Version slicée pour l'affichage
+    recent_submissions = all_recent_submissions[:10]
     
     # Statistiques globales
     total_exercises = exercises.count()
@@ -117,12 +120,12 @@ def teacher_dashboard(request):
     
     # Taux moyen de réussite
     avg_score_pct = Evaluation.objects.filter(
-        submission_exercise_author=teacher
+        submission__exercise__author=teacher
     ).aggregate(avg=Avg('percentage'))['avg'] or 0
     
     # Distribution des notes (pour graphiques)
     score_distribution = Evaluation.objects.filter(
-        submission_exercise_author=teacher
+        submission__exercise__author=teacher
     ).annotate(
         range=Case(
             When(percentage__lt=20, then=Value('0-20%')),
@@ -144,7 +147,8 @@ def teacher_dashboard(request):
     ).values('day').annotate(count=Count('id')).order_by('day')
     
     # Calcul des tâches à faire
-    pending_evaluations = recent_submissions.filter(status='pending').count()
+    # Utiliser all_recent_submissions au lieu de recent_submissions
+    pending_evaluations = all_recent_submissions.filter(status='pending').count()
     
     # Exercices sans correction
     exercises_without_correction = 0
@@ -171,8 +175,8 @@ def teacher_dashboard(request):
     
     for topic in topics:
         avg = Evaluation.objects.filter(
-            submission_exercise_topic=topic,
-            submission_exercise_author=teacher
+            submission__exercise__topic=topic,
+            submission__exercise__author=teacher
         ).aggregate(avg=Avg('score'))['avg']
         
         if avg is not None:
@@ -198,7 +202,6 @@ def teacher_dashboard(request):
     }
     
     return render(request, 'dashboard/teacher_dashboard.html', context)
-
 
 @login_required
 def exercise_stats_view(request, exercise_id):
