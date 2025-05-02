@@ -126,10 +126,10 @@ class ExerciseAssignmentForm(forms.ModelForm):
             'note_to_student': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
     
-    def _init_(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):  # Correction ici: __init__ au lieu de _init_
         # On peut passer un exercice spécifique pour filtrer les assignations
         exercise = kwargs.pop('exercise', None)
-        super()._init_(*args, **kwargs)
+        super().__init__(*args, **kwargs)  # Et ici aussi
         
         from django.contrib.auth import get_user_model
         User = get_user_model()

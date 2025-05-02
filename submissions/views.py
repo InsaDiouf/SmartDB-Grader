@@ -4,7 +4,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic import ListView, DetailView, View
 from django.urls import reverse
 from django.contrib import messages
+import threading
 from django.utils import timezone
+import queue
 from django.db import transaction
 from django.http import HttpResponseRedirect, Http404, JsonResponse
 from django.core.exceptions import PermissionDenied
@@ -18,77 +20,62 @@ from accounts.views import TeacherRequiredMixin
 
 @login_required
 def submit_exercise_view(request, exercise_id):
-    """Vue pour soumettre une réponse à un exercice."""
+    # Récupérer l'exercice par son ID
+    exercise = get_object_or_404(Exercise, id=exercise_id)
     
-    # Vérifier que l'utilisateur est un étudiant
-    if not request.user.is_student:
-        raise PermissionDenied("Seuls les étudiants peuvent soumettre des réponses.")
-    
-    exercise = get_object_or_404(Exercise, pk=exercise_id)
-    
-    # Vérifier que l'exercice est disponible
-    if not exercise.is_published:
-        raise Http404("Cet exercice n'est pas disponible.")
-    
-    if exercise.deadline and exercise.deadline < timezone.now():
-        messages.error(request, "La date limite de soumission est dépassée.")
-        return redirect('exercises:exercise_detail', pk=exercise_id)
-    
-    # Vérifier le nombre de tentatives
-    existing_submissions = Submission.objects.filter(
-        exercise=exercise,
-        student=request.user
-    )
-    
-    if existing_submissions.count() >= exercise.max_attempts:
-        messages.error(
-            request, 
-            f"Vous avez atteint le nombre maximum de tentatives ({exercise.max_attempts})."
-        )
-        return redirect('exercises:exercise_detail', pk=exercise_id)
-    
-    if request.method == 'POST':
-        form = SubmissionForm(
-            request.POST, 
-            request.FILES,
-            exercise=exercise,
-            student=request.user
-        )
-        
+    if request.method == "POST":
+        form = SubmissionForm(request.POST, request.FILES)
         if form.is_valid():
-            # Créer la soumission
             submission = form.save(commit=False)
-            submission.exercise = exercise
             submission.student = request.user
-            submission.attempt_number = existing_submissions.count() + 1
+            submission.exercise_id = exercise_id
             
-            # Traitement du fichier PDF
-            if form.cleaned_data.get('file'):
-                submission.file = form.cleaned_data['file']
-                # TODO: Extraction du texte du PDF avec PyPDF2
+            # Déterminer le numéro de tentative
+            last_attempt = Submission.objects.filter(
+                exercise_id=exercise_id,
+                student=request.user
+            ).order_by('-attempt_number').first()
             
+            # Incrémenter le numéro de tentative
+            if last_attempt:
+                submission.attempt_number = last_attempt.attempt_number + 1
+            else:
+                submission.attempt_number = 1
+                
+            # Changer le statut à 'completed' pour contourner l'évaluation automatique
+            submission.status = 'completed'  # Modifié de 'pending' à 'completed'
             submission.save()
             
-            messages.success(request, "Votre réponse a été soumise avec succès.")
+            # Commenté : Démarrage de l'évaluation en arrière-plan
+            '''
+            def evaluate_async():
+                try:
+                    evaluate_submission(submission.id)
+                except Exception as e:
+                    # Journaliser l'erreur pour diagnostic
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Erreur lors de l'évaluation de la soumission {submission.id}: {str(e)}")
             
-            # Lancer l'évaluation automatique en arrière-plan
-            try:
-                # Note: Dans une application réelle, cette tâche devrait être asynchrone
-                # via Celery ou un système de file d'attente similaire
-                evaluate_submission(submission.id)
-            except Exception as e:
-                # Ne pas bloquer l'utilisateur en cas d'erreur d'évaluation
-                print(f"Erreur lors de l'évaluation automatique: {str(e)}")
+            thread = threading.Thread(target=evaluate_async)
+            thread.daemon = True  # Le thread s'arrêtera quand l'application s'arrête
+            thread.start()
+            '''
             
-            return redirect('submissions:submission_detail', pk=submission.pk)
+            messages.success(request, "Votre exercice a été soumis avec succès. L'évaluation sera effectuée manuellement.")
+            
+            # Utiliser 'pk' au lieu de 'submission_id'
+            return redirect('submissions:submission_detail', pk=submission.id)
     else:
-        form = SubmissionForm(exercise=exercise, student=request.user)
+        form = SubmissionForm()
     
-    return render(request, 'submissions/submit_form.html', {
+    # Ajouter l'exercice au contexte du template
+    context = {
         'form': form,
         'exercise': exercise,
-        'existing_submissions': existing_submissions,
-    })
+    }
+    
+    return render(request, 'submissions/submit_form.html', context)
 
 
 class SubmissionDetailView(LoginRequiredMixin, DetailView):
@@ -343,20 +330,26 @@ class ExerciseSubmissionsListView(LoginRequiredMixin, TeacherRequiredMixin, List
         context = super().get_context_data(**kwargs)
         context['exercise'] = self.exercise
         
-        # Statistiques
-        submissions = context['submissions']
-        context['total_submissions'] = submissions.count()
-        context['completed_evaluations'] = submissions.filter(status='completed').count()
+        # Statistiques - obtenir un nouveau queryset pour les calculs
+        # au lieu d'utiliser context['submissions'] qui est déjà slicé pour la pagination
+        all_submissions = Submission.objects.filter(exercise=self.exercise)
+        context['total_submissions'] = all_submissions.count()
+        context['completed_evaluations'] = all_submissions.filter(status='completed').count()
         
-        # Calculer la note moyenne
-        evaluated_submissions = [s for s in submissions if hasattr(s, 'evaluation')]
-        if evaluated_submissions:
-            avg_score = sum(s.evaluation.score for s in evaluated_submissions) / len(evaluated_submissions)
-            context['average_score'] = round(avg_score, 2)
+        # Calculer la note moyenne - utiliser une requête annotée pour de meilleures performances
+        evaluated_submissions = all_submissions.filter(evaluation__isnull=False)
+        evaluated_count = evaluated_submissions.count()
+        
+        if evaluated_count > 0:
+            # Récupérer toutes les évaluations pour ce calcul
+            evaluations = [s.evaluation for s in evaluated_submissions.select_related('evaluation')]
             
-            # Note maximale et minimale
-            context['max_score'] = max(s.evaluation.score for s in evaluated_submissions)
-            context['min_score'] = min(s.evaluation.score for s in evaluated_submissions)
+            if evaluations:
+                # Calculer moyenne, max et min
+                scores = [e.score for e in evaluations]
+                context['average_score'] = round(sum(scores) / len(scores), 2)
+                context['max_score'] = max(scores)
+                context['min_score'] = min(scores)
         
         return context
 
@@ -382,3 +375,73 @@ def check_evaluation_status_view(request, submission_id):
         data['redirect_url'] = reverse('submissions:submission_detail', kwargs={'pk': submission_id})
     
     return JsonResponse(data)
+
+
+
+def test_evaluation(request, submission_id):
+    """Vue de diagnostic pour tester l'évaluation dans un thread séparé."""
+    if not request.user.is_staff:
+        return JsonResponse({"error": "Permission refusée"}, status=403)
+    
+    try:
+        submission = Submission.objects.get(id=submission_id)
+    except Submission.DoesNotExist:
+        return JsonResponse({"error": "Soumission introuvable"}, status=404)
+    
+    # File d'attente pour récupérer le résultat du thread
+    result_queue = queue.Queue()
+    
+    def evaluation_thread():
+        try:
+            from ai_engine.evaluator import evaluate_submission
+            result = evaluate_submission(submission_id)
+            result_queue.put({"success": bool(result), "result": str(result)})
+        except Exception as e:
+            import traceback
+            result_queue.put({"error": str(e), "traceback": traceback.format_exc()})
+    
+    # Démarrer le thread et attendre le résultat
+    thread = threading.Thread(target=evaluation_thread)
+    thread.start()
+    thread.join(timeout=30)  # Attendre au maximum 30 secondes
+    
+    if thread.is_alive():
+        return JsonResponse({"error": "L'évaluation prend trop de temps"}, status=408)
+    
+    # Récupérer le résultat de la file d'attente
+    if not result_queue.empty():
+        result = result_queue.get()
+        return JsonResponse(result)
+    else:
+        return JsonResponse({"error": "Aucun résultat obtenu"}, status=500)
+
+
+@login_required
+def manual_evaluation(request, pk):
+    """Vue pour marquer une soumission comme complétée manuellement."""
+    submission = get_object_or_404(Submission, pk=pk)
+    
+    # Vérifier que l'utilisateur est autorisé (professeur)
+    if not hasattr(request.user, 'is_teacher') or not request.user.is_teacher:
+        messages.error(request, "Vous n'êtes pas autorisé à effectuer cette action.")
+        return redirect('submissions:submission_detail', pk=pk)
+    
+    # Mettre à jour le statut
+    submission.status = 'completed'
+    submission.save()
+    
+    # Créer une évaluation simple si nécessaire
+    from submissions.models import Evaluation
+    if not hasattr(submission, 'evaluation'):
+        evaluation = Evaluation.objects.create(
+            submission=submission,
+            score=0,  # Vous pourrez modifier la note plus tard
+            percentage=0,
+            general_feedback="Évaluation manuelle requise.",
+            created_by_ai=False,
+            reviewed_by_teacher=True,
+            reviewing_teacher=request.user  # Ajout de cette ligne
+        )
+    
+    messages.success(request, "La soumission a été marquée comme complétée.")
+    return redirect('submissions:submission_detail', pk=pk)

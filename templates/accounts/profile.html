@@ -10,7 +10,7 @@
         <div class="col-lg-8 mx-auto">
             <div class="card shadow">
                 <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">Créer un compte</h4>
+                    <h4 class="mb-0">Mon compte</h4>
                 </div>
                 <div class="card-body">
                     <form method="post" class="mb-4">
@@ -19,40 +19,58 @@
                         <h5 class="mb-3">Informations personnelles</h5>
                         <div class="row">
                             <div class="col-md-6">
-                                {{ form.first_name|as_crispy_field }}
+                                {% if form.first_name %}
+                                    {{ form.first_name|as_crispy_field }}
+                                {% else %}
+                                    <div class="mb-3">
+                                        <label for="id_first_name" class="form-label">Prénom</label>
+                                        <input type="text" name="first_name" id="id_first_name" class="form-control" value="{{ user.first_name }}">
+                                    </div>
+                                {% endif %}
                             </div>
                             <div class="col-md-6">
-                                {{ form.last_name|as_crispy_field }}
+                                {% if form.last_name %}
+                                    {{ form.last_name|as_crispy_field }}
+                                {% else %}
+                                    <div class="mb-3">
+                                        <label for="id_last_name" class="form-label">Nom</label>
+                                        <input type="text" name="last_name" id="id_last_name" class="form-control" value="{{ user.last_name }}">
+                                    </div>
+                                {% endif %}
                             </div>
                         </div>
                         
                         <div class="mb-3">
-                            {{ form.email|as_crispy_field }}
+                            {% if form.email %}
+                                {{ form.email|as_crispy_field }}
+                            {% else %}
+                                <div class="mb-3">
+                                    <label for="id_email" class="form-label">Email</label>
+                                    <input type="email" name="email" id="id_email" class="form-control" value="{{ user.email }}">
+                                </div>
+                            {% endif %}
                         </div>
                         
                         <h5 class="mb-3 mt-4">Type de compte</h5>
                         <div class="mb-3">
-                            {{ form.user_type|as_crispy_field }}
+                            {% if form.user_type %}
+                                {{ form.user_type|as_crispy_field }}
+                            {% endif %}
                         </div>
                         
                         <h5 class="mb-3 mt-4">Sécurité</h5>
                         <div class="mb-3">
-                            {{ form.password1|as_crispy_field }}
+                            {% if form.password1 %}
+                                {{ form.password1|as_crispy_field }}
+                            {% endif %}
                         </div>
                         <div class="mb-3">
-                            {{ form.password2|as_crispy_field }}
+                            {% if form.password2 %}
+                                {{ form.password2|as_crispy_field }}
+                            {% endif %}
                         </div>
                         
-                        <div class="d-grid gap-2 mt-4">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-person-plus me-2"></i>S'inscrire
-                            </button>
-                        </div>
                     </form>
-                    
-                    <div class="text-center">
-                        <p>Vous avez déjà un compte ? <a href="{% url 'accounts:login' %}">Connectez-vous</a></p>
-                    </div>
                 </div>
             </div>
         </div>

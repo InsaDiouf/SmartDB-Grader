@@ -11,6 +11,8 @@ urlpatterns = [
     path('exercise/<int:exercise_id>/all/', views.ExerciseSubmissionsListView.as_view(), name='exercise_submissions'),
     
     # Gestion des évaluations
+    path('test-evaluation/<int:submission_id>/', views.test_evaluation, name='test_evaluation'),
+    path('manual-evaluation/<int:pk>/', views.manual_evaluation, name='manual_evaluation'),
     path('<int:submission_id>/review/', views.evaluation_review_view, name='evaluation_review'),
     path('<int:submission_id>/add-feedback/', views.add_feedback_item_view, name='add_feedback'),
     path('feedback/<int:feedback_item_id>/edit/', views.edit_feedback_item_view, name='edit_feedback'),

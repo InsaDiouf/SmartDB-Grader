@@ -100,6 +100,26 @@
                         <p class="text-muted">Votre soumission est en attente de traitement.</p>
                     </div>
                 </div>
+                
+                <!-- Ajout du bouton d'évaluation manuelle pour les professeurs -->
+                {% if user.is_teacher %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Évaluation manuelle</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">
+                            L'évaluation automatique n'est pas disponible pour le moment. Vous pouvez créer une évaluation manuelle pour cette soumission.
+                        </p>
+                        <form method="post" action="{% url 'submissions:manual_evaluation' pk=submission.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle me-2"></i>Créer une évaluation manuelle
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
             {% elif submission.status == 'error' %}
                 <div class="card shadow-sm mb-4">
                     <div class="card-body text-center py-5">

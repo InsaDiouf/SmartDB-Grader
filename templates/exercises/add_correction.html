@@ -51,10 +51,10 @@
                                 </label>
                             </div>
                             <small class="form-text text-muted">
-                                {% if exercise.corrections.filter(is_primary=True).exists %}
-                                    Une correction principale existe déjà. Si vous cochez cette option, elle remplacera la correction principale actuelle.
+                                {% if exercise.corrections.filter.is_primary.exists %}
+                                Une correction principale existe déjà. Si vous cochez cette option, elle remplacera la correction principale actuelle.
                                 {% else %}
-                                    Si coché, cette correction sera utilisée comme référence principale pour l'évaluation automatique.
+                                Si coché, cette correction sera utilisée comme référence principale pour l'évaluation automatique.
                                 {% endif %}
                             </small>
                         </div>

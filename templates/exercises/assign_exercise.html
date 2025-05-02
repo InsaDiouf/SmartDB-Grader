@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Assigner l'exercice {{ exercise.title }} - Plateforme d'Évaluation Automatisée{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Assigner l'exercice</h4>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h5>{{ exercise.title }}</h5>
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge {% if exercise.difficulty.value == 1 %}bg-success{% elif exercise.difficulty.value == 2 %}bg-info{% elif exercise.difficulty.value == 3 %}bg-warning{% elif exercise.difficulty.value == 4 %}bg-danger{% else %}bg-secondary{% endif %} me-2">
+                                {{ exercise.difficulty.name }}
+                            </span>
+                            <span class="badge bg-secondary me-2">{{ exercise.topic.name }}</span>
+                            <span class="text-muted">{{ exercise.total_points }} points</span>
+                        </div>
+                        <p class="text-muted">Date de fin globale: 
+                            {% if exercise.end_date %}
+                                {{ exercise.end_date|date:"d/m/Y à H:i" }}
+                            {% else %}
+                                Aucune
+                            {% endif %}
+                        </p>
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            {{ form.assigned_to|as_crispy_field }}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.custom_deadline|as_crispy_field }}
+                            <small class="form-text text-muted">Laisser vide pour utiliser la date de fin globale de l'exercice.</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.note_to_student|as_crispy_field }}
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'exercises:exercise_detail' pk=exercise.id %}" class="btn btn-outline-secondary">
+                                Annuler
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-person-plus me-2"></i>Assigner
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

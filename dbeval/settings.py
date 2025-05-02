@@ -27,7 +27,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.sites',  # Requis pour django-allauth
+    'django.contrib.sites', 
+    'django_crontab', # Requis pour django-allauth
     
     # Applications tierces
     'crispy_forms',
@@ -307,3 +308,7 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     X_FRAME_OPTIONS = 'DENY'
+
+CRONJOBS = [
+    ('*/5 * * * *', 'ai_engine.evaluator.evaluate_pending_submissions', '>> /tmp/smartdb_evaluation.log'),
+]

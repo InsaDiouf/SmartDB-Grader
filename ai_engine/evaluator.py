@@ -274,6 +274,7 @@ async def evaluate_submission_async(submission_id):
 
 
 # Fonction synchrone pour lancer l'évaluation (à utiliser dans les vues)
+# Remplacer la fonction existante
 def evaluate_submission(submission_id):
     """
     Fonction synchrone pour lancer l'évaluation (à utiliser dans les vues).
@@ -284,7 +285,22 @@ def evaluate_submission(submission_id):
     Returns:
         Evaluation: Instance de l'évaluation créée ou None en cas d'échec
     """
-    return asyncio.run(evaluate_submission_async(submission_id))
+    # Créer un nouvel event loop au lieu d'utiliser asyncio.run
+    import asyncio
+    try:
+        # Pour les contextes où il n'y a pas déjà de loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(evaluate_submission_async(submission_id))
+    except RuntimeError:
+        # Si nous sommes déjà dans un contexte asynchrone
+        import nest_asyncio
+        nest_asyncio.apply()
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(evaluate_submission_async(submission_id))
+    finally:
+        if 'loop' in locals() and loop is not asyncio.get_event_loop():
+            loop.close()
 
 
 # Fonction pour évaluer les soumissions en attente (à utiliser dans des tâches planifiées)

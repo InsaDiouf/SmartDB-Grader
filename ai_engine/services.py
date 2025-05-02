@@ -4,6 +4,7 @@ import logging
 import httpx
 from django.conf import settings
 from django.utils import timezone
+from asgiref.sync import sync_to_async
 from .models import AIModel, AIPromptTemplate, AIEvaluationJob
 
 logger = logging.getLogger(__name__)
@@ -14,9 +15,21 @@ class AIEvaluationService:
     
     def __init__(self, model_id=None):
         """Initialiser le service avec un modèle spécifique ou le modèle par défaut."""
-        if model_id:
+        # Solution : utiliser un système d'initialisation différé
+        self.ai_model = None
+        self.model_id = model_id
+        
+        # Exécuter l'initialisation de manière synchrone si nous ne sommes pas dans un contexte async
+        try:
+            self._initialize_model()
+        except Exception as e:
+            logger.error(f"Erreur d'initialisation du modèle: {str(e)}")
+    
+    def _initialize_model(self):
+        """Initialiser le modèle de manière synchrone."""
+        if self.model_id:
             try:
-                self.ai_model = AIModel.objects.get(id=model_id, is_active=True)
+                self.ai_model = AIModel.objects.get(id=self.model_id, is_active=True)
             except AIModel.DoesNotExist:
                 self.ai_model = AIModel.objects.filter(is_active=True).first()
         else:
@@ -37,35 +50,46 @@ class AIEvaluationService:
         Returns:
             dict: Résultat de l'évaluation
         """
+        # Si le modèle n'est pas initialisé, essayer de l'initialiser de manière asynchrone
+        if self.ai_model is None:
+            try:
+                await sync_to_async(self._initialize_model)()
+            except Exception as e:
+                logger.error(f"Erreur lors de l'initialisation asynchrone du modèle: {str(e)}")
+                return None
+        
+        # Utiliser sync_to_async pour les opérations de base de données
+        create_job = sync_to_async(AIEvaluationJob.objects.create)
+        get_prompt_template = sync_to_async(AIPromptTemplate.objects.get)
+        filter_prompt_template = sync_to_async(lambda: AIPromptTemplate.objects.filter(task_type='evaluation').first())
+        
         # Récupérer ou créer une tâche d'évaluation
-        evaluation_job = AIEvaluationJob.objects.create(
+        evaluation_job = await create_job(
             submission=submission,
             model=self.ai_model,
             status='processing'
         )
         
         # Récupérer le template de prompt approprié
+        prompt_template = None
         if prompt_template_id:
             try:
-                prompt_template = AIPromptTemplate.objects.get(id=prompt_template_id)
+                prompt_template = await get_prompt_template(id=prompt_template_id)
             except AIPromptTemplate.DoesNotExist:
-                prompt_template = AIPromptTemplate.objects.filter(
-                    task_type='evaluation'
-                ).first()
+                prompt_template = await filter_prompt_template()
         else:
             # Utiliser le template d'évaluation par défaut
-            prompt_template = AIPromptTemplate.objects.filter(
-                task_type='evaluation'
-            ).first()
+            prompt_template = await filter_prompt_template()
         
         if not prompt_template:
-            evaluation_job.status = 'failed'
-            evaluation_job.error_message = "Aucun template de prompt disponible"
-            evaluation_job.save()
+            # Mettre à jour le job de manière asynchrone
+            await sync_to_async(self._update_job_status)(
+                evaluation_job, 'failed', "Aucun template de prompt disponible"
+            )
             return None
-            
-        evaluation_job.prompt_template = prompt_template
-        evaluation_job.save()
+        
+        # Mettre à jour le job de manière asynchrone
+        await sync_to_async(self._update_job_with_template)(evaluation_job, prompt_template)
         
         # Préparer les données pour le prompt
         exercise = submission.exercise
@@ -74,9 +98,8 @@ class AIEvaluationService:
         
         # Récupérer la correction si disponible
         if exercise.has_corrections:
-            correction = exercise.corrections.filter(is_primary=True).first()
-            if not correction:
-                correction = exercise.corrections.first()
+            get_correction = sync_to_async(lambda: exercise.corrections.filter(is_primary=True).first() or exercise.corrections.first())
+            correction = await get_correction()
         
         # Préparer les variables pour le template
         prompt_variables = {
@@ -84,7 +107,7 @@ class AIEvaluationService:
             'exercise_description': exercise.description,
             'exercise_content': exercise.file_content_text,
             'submission_content': submission.file_content_text,
-            'student_name': student.get_full_name(),
+            'student_name': await sync_to_async(student.get_full_name)(),
             'total_points': exercise.total_points,
         }
         
@@ -96,14 +119,13 @@ class AIEvaluationService:
         try:
             formatted_prompt = prompt_template.prompt_text.format(**prompt_variables)
         except KeyError as e:
-            evaluation_job.status = 'failed'
-            evaluation_job.error_message = f"Variable manquante dans le template: {str(e)}"
-            evaluation_job.save()
+            await sync_to_async(self._update_job_status)(
+                evaluation_job, 'failed', f"Variable manquante dans le template: {str(e)}"
+            )
             return None
         
         # Enregistrer le prompt utilisé
-        evaluation_job.prompt_used = formatted_prompt
-        evaluation_job.save()
+        await sync_to_async(self._update_job_prompt)(evaluation_job, formatted_prompt)
         
         # Préparer la requête pour l'API Ollama
         start_time = time.time()
@@ -128,16 +150,16 @@ class AIEvaluationService:
                 result = response.json()
         except httpx.RequestError as e:
             # Gérer les erreurs de requête
-            evaluation_job.status = 'failed'
-            evaluation_job.error_message = f"Erreur de requête: {str(e)}"
-            evaluation_job.save()
+            await sync_to_async(self._update_job_status)(
+                evaluation_job, 'failed', f"Erreur de requête: {str(e)}"
+            )
             logger.error(f"Erreur lors de la requête AI: {str(e)}")
             return None
         except Exception as e:
             # Gérer les autres erreurs
-            evaluation_job.status = 'failed'
-            evaluation_job.error_message = f"Erreur inattendue: {str(e)}"
-            evaluation_job.save()
+            await sync_to_async(self._update_job_status)(
+                evaluation_job, 'failed', f"Erreur inattendue: {str(e)}"
+            )
             logger.error(f"Erreur inattendue: {str(e)}")
             return None
         
@@ -145,27 +167,50 @@ class AIEvaluationService:
         processing_time = time.time() - start_time
         
         # Mettre à jour le job avec les résultats
-        evaluation_job.status = 'completed'
-        evaluation_job.completed_at = timezone.now()
-        evaluation_job.processing_time = processing_time
-        evaluation_job.response_json = result
-        
-        # Extraire les tokens utilisés si disponible
-        if 'usage' in result and 'total_tokens' in result['usage']:
-            evaluation_job.token_usage = result['usage']['total_tokens']
-            
-        evaluation_job.save()
+        await sync_to_async(self._update_job_result)(
+            evaluation_job, 'completed', result, processing_time
+        )
         
         # Extraire et retourner les résultats formatés
         try:
-            evaluation_result = self._parse_ai_response(result)
+            evaluation_result = await sync_to_async(self._parse_ai_response)(result)
             return evaluation_result
         except Exception as e:
             logger.error(f"Erreur lors du parsing de la réponse AI: {str(e)}")
-            evaluation_job.status = 'failed'
-            evaluation_job.error_message = f"Erreur de parsing: {str(e)}"
-            evaluation_job.save()
+            await sync_to_async(self._update_job_status)(
+                evaluation_job, 'failed', f"Erreur de parsing: {str(e)}"
+            )
             return None
+    
+    def _update_job_status(self, job, status, error_message=None):
+        """Mettre à jour le statut d'un job."""
+        job.status = status
+        if error_message:
+            job.error_message = error_message
+        job.save()
+    
+    def _update_job_with_template(self, job, template):
+        """Mettre à jour le job avec un template."""
+        job.prompt_template = template
+        job.save()
+    
+    def _update_job_prompt(self, job, prompt):
+        """Mettre à jour le prompt utilisé par un job."""
+        job.prompt_used = prompt
+        job.save()
+    
+    def _update_job_result(self, job, status, result, processing_time):
+        """Mettre à jour un job avec les résultats."""
+        job.status = status
+        job.completed_at = timezone.now()
+        job.processing_time = processing_time
+        job.response_json = result
+        
+        # Extraire les tokens utilisés si disponible
+        if 'usage' in result and 'total_tokens' in result['usage']:
+            job.token_usage = result['usage']['total_tokens']
+            
+        job.save()
     
     def _parse_ai_response(self, response):
         """

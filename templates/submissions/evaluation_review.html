@@ -59,22 +59,25 @@
                                         <h6 class="text-muted mb-3">Type d'évaluation</h6>
                                         <div>
                                             {% if evaluation.reviewed_by_teacher %}
-                                                <span class="badge bg-info">
-                                                    <i class="bi bi-check-circle me-1"></i>Révisée par professeur
-                                                </span>
-                                                <div class="text-muted small mt-2">
+                                            <span class="badge bg-info">
+                                                <i class="bi bi-check-circle me-1"></i>Révisée par professeur
+                                            </span>
+                                            <div class="text-muted small mt-2">
+                                                {% if evaluation.reviewing_teacher %}
                                                     Par {{ evaluation.reviewing_teacher.get_full_name|default:evaluation.reviewing_teacher.email }}
                                                     le {{ evaluation.updated_at|date:"d/m/Y" }}
-                                                </div>
+                                                {% else %}
+                                                    Le {{ evaluation.updated_at|date:"d/m/Y" }}
+                                                {% endif %}
+                                            </div>
                                             {% else %}
-                                                <span class="badge bg-secondary">
-                                                    <i class="bi bi-robot me-1"></i>Générée par IA
-                                                </span>
-                                                <div class="text-muted small mt-2">
-                                                    Le {{ evaluation.created_at|date:"d/m/Y" }}
-                                                </div>
+                                            <span class="badge bg-secondary">
+                                                <i class="bi bi-robot me-1"></i>Générée par IA
+                                            </span>
+                                            <div class="text-muted small mt-2">
+                                                Le {{ evaluation.created_at|date:"d/m/Y" }}
+                                            </div>
                                             {% endif %}
-                                        </div>
                                     </div>
                                 </div>
                             </div>
